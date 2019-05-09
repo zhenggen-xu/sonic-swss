@@ -470,6 +470,9 @@ void PfcWdSwOrch<DropHandler, ForwardHandler>::registerInWdDb(const Port& port,
         losslessTc.insert(i);
     }
 
+    // hardcode TC 3 to lossless
+    losslessTc.insert(3);
+
     if (!c_portStatIds.empty())
     {
         string key = getFlexCounterTableKey(sai_serialize_object_id(port.m_port_id));
