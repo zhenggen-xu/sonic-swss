@@ -11,7 +11,7 @@
 namespace swss {
 
 #define INGRESS_LOSSLESS_PG_POOL_NAME "ingress_lossless_pool"
-#define LOSSLESS_PGS "3-4"
+#define LOSSLESS_PGS "3"
 
 typedef struct{
     string size;
