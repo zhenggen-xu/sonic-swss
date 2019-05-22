@@ -1321,6 +1321,29 @@ bool PortsOrch::addPort(const set<int> &lane_set, uint32_t speed, int an, string
     return true;
 }
 
+bool PortsOrch::removePort(string port_alias)
+{
+    SWSS_LOG_ENTER();
+
+    Port p;
+    if (getPort(port_alias, p))
+    {
+        PortUpdate update = {p, false };
+        notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
+    }
+
+    sai_status_t status = sai_port_api->remove_port(port_id);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Failed to remove port %lx, rv:%d", port_id, status);
+        return false;
+    }
+    //removeAclTableGroup(p);
+    SWSS_LOG_NOTICE("Remove port %lx", port_id);
+
+    return true;
+}
+
 bool PortsOrch::removePort(sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
@@ -1948,7 +1971,11 @@ void PortsOrch::doPortTask(Consumer &consumer)
         }
         else
         {
-            SWSS_LOG_ERROR("Unknown operation type %s", op.c_str());
+            SWSS_LOG_NOTICE("Deleting Port %s", alias.c_str());
+            if (!removePort(alias))
+            {
+                throw runtime_error("Delete port %s failed", alias.c_str());
+            }
         }
 
         it = consumer.m_toSync.erase(it);
