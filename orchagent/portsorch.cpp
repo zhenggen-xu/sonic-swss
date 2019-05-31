@@ -1323,13 +1323,14 @@ bool PortsOrch::removePort(sai_object_id_t port_id)
         notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
     }
 
+    removeAclTableGroup(p);
+
     sai_status_t status = sai_port_api->remove_port(port_id);
     if (status != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("Failed to remove port %" PRIx64 ", rv:%d", port_id, status);
         return false;
     }
-    removeAclTableGroup(p);
     
     m_portCount--;
     SWSS_LOG_NOTICE("Remove port %" PRIx64, port_id);
@@ -1441,11 +1442,7 @@ void PortsOrch::deinitport(string alias, sai_object_id_t port_id)
     string key = getPortFlexCounterTableKey(sai_serialize_object_id(port_id));
     m_flexCounterTable->del(key);
 
-    /* Delete port from port list */
-    m_portList.erase(alias);
-
     SWSS_LOG_NOTICE("De-Initialized port %s", alias.c_str());
-
 }
 
 
@@ -2014,6 +2011,9 @@ void PortsOrch::doPortTask(Consumer &consumer)
             }
             removePortFromLanesMap(alias);
             removePortFromPortListMap(port_id);
+
+            /* Delete port from port list */
+            m_portList.erase(alias);
         }
 
         it = consumer.m_toSync.erase(it);
