@@ -215,6 +215,13 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     /* Insert or update the ifindex to key map */
     m_ifindexNameMap[ifindex] = key;
 
+    /* TODO: When port is removed from the kernel */
+    if (nlmsg_type == RTM_DELLINK)
+    {
+        m_statePortTable.del(key);
+        SWSS_LOG_NOTICE("Delete %s(ok) from state db", key.c_str());
+    }
+
     /* front panel interfaces: Check if the port is in the PORT_TABLE
      * non-front panel interfaces such as eth0, lo which are not in the
      * PORT_TABLE are ignored. */
@@ -235,7 +242,7 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
             vector<FieldValueTuple> vector;
             vector.push_back(tuple);
             m_statePortTable.set(key, vector);
-            SWSS_LOG_INFO("Publish %s(ok) to state db", key.c_str());
+            SWSS_LOG_NOTICE("Publish %s(ok) to state db", key.c_str());
         }
     }
 }
