@@ -23,6 +23,7 @@
 #include "countercheckorch.h"
 #include "notifier.h"
 #include "redisclient.h"
+#include "sairedis.h"
 
 extern sai_switch_api_t *sai_switch_api;
 extern sai_bridge_api_t *sai_bridge_api;
@@ -1316,6 +1317,7 @@ bool PortsOrch::removePort(sai_object_id_t port_id)
         return false;
     }
 
+    flush();
     m_portCount--;
     SWSS_LOG_NOTICE("Remove port %lx", port_id);
 
@@ -1514,6 +1516,20 @@ void PortsOrch::removePortFromPortListMap(sai_object_id_t port_id)
     }
 }
 
+/* Flush redis through sairedis interface */
+void PortsOrch::flush()
+{
+    SWSS_LOG_ENTER();
+
+    sai_attribute_t attr;
+    attr.id = SAI_REDIS_SWITCH_ATTR_FLUSH;
+    sai_status_t status = sai_switch_api->set_switch_attribute(gSwitchId, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Failed to flush redis pipeline %d", status);
+        exit(EXIT_FAILURE);
+    }
+}
 
 void PortsOrch::doPortTask(Consumer &consumer)
 {
@@ -1933,6 +1949,7 @@ void PortsOrch::doPortTask(Consumer &consumer)
             auto hif_id = m_portList[alias].m_hif_id;
 
             deinitport(alias, port_id);
+            sleep (1);
 
             SWSS_LOG_NOTICE("Removing hostif %lx for Port %s", hif_id, alias.c_str());
             sai_status_t status = sai_hostif_api->remove_hostif(hif_id);
