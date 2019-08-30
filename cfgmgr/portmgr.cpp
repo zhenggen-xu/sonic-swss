@@ -28,13 +28,6 @@ bool PortMgr::setPortMtu(const string &alias, const string &mtu)
     cmd << IP_CMD << " link set dev " << alias << " mtu " << mtu;
     EXEC_WITH_ERROR_THROW(cmd.str(), res);
 
-    // Set the port MTU in application database to update both
-    // the port MTU and possibly the port based router interface MTU
-    vector<FieldValueTuple> fvs;
-    FieldValueTuple fv("mtu", mtu);
-    fvs.push_back(fv);
-    m_appPortTable.set(alias, fvs);
-
     return true;
 }
 
@@ -46,11 +39,6 @@ bool PortMgr::setPortAdminStatus(const string &alias, const bool up)
     // ip link set dev <port_name> [up|down]
     cmd << IP_CMD << " link set dev " << alias << (up ? " up" : " down");
     EXEC_WITH_ERROR_THROW(cmd.str(), res);
-
-    vector<FieldValueTuple> fvs;
-    FieldValueTuple fv("admin_status", (up ? "up" : "down"));
-    fvs.push_back(fv);
-    m_appPortTable.set(alias, fvs);
 
     return true;
 }
@@ -68,6 +56,107 @@ bool PortMgr::isPortStateOk(const string &alias)
     return false;
 }
 
+// This function set the default value of the kernelsettings' field
+// to fvs if the field does not exist in fvs
+void PortMgr::constructKernelSettings(const KernelSettingMap &kernelsettings,
+  vector<FieldValueTuple> &fvs)
+{
+    bool found = false;
+
+    for (auto it : kernelsettings)
+    {
+        for (auto i : fvs)
+        {
+            if (fvField(i) == it.first)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            FieldValueTuple fv(it.first, it.second);
+            fvs.push_back(fv);
+        }
+    }
+
+    return;
+}
+
+// Get kernel settings from fvs if exist
+void PortMgr::getKernelSettingsFromFVS(KernelSettingMap &kernelsettings,
+  const vector<FieldValueTuple> &fvs)
+{
+    for (auto& it : kernelsettings)
+    {
+        for (auto i : fvs)
+        {
+            if (fvField(i) == it.first)
+            {
+                it.second = fvValue(i);
+                break;
+            }
+        }
+    }
+}
+
+// This function save the kernelsettings to a global map
+// If kernelsettings is empty, return false. Else return true.
+bool PortMgr::saveKernelSettingsMap(const string &alias,
+    KernelSettingMap &kernelsettings)
+{
+    string admin_status = "admin_status";
+    string mtu = "mtu";
+
+    /* no need to update the map if no new settings*/
+    if (kernelsettings[admin_status].empty()
+        && kernelsettings[mtu].empty())
+    {
+        return false;
+    }
+
+    auto exist_kofvs = m_kernelSettingMap.find(alias);
+
+    // no settings exist, use the new settings
+    if (exist_kofvs == m_kernelSettingMap.end())
+    {
+        m_kernelSettingMap[alias] = kernelsettings;
+        return true;
+    }
+
+    // update the old settings with new non-empty settings
+    for (auto& newsettings : kernelsettings)
+    {
+        if (!newsettings.second.empty())
+        {
+            m_kernelSettingMap[alias][newsettings.first] = newsettings.second;
+        }
+    }
+
+    return true;
+}
+
+void PortMgr::doConfigKernelSettings(const string &alias, KernelSettingMap &settings)
+{
+    string mtu, admin_status;
+
+    mtu = settings["mtu"];
+    admin_status = settings["admin_status"];
+
+    if (!mtu.empty())
+    {
+        setPortMtu(alias, mtu);
+        SWSS_LOG_NOTICE("Configure %s MTU to %s", alias.c_str(), mtu.c_str());
+    }
+
+    if (!admin_status.empty())
+    {
+        setPortAdminStatus(alias, admin_status == "up");
+        SWSS_LOG_NOTICE("Configure %s admin status to %s", alias.c_str(), admin_status.c_str());
+    }
+}
+
 void PortMgr::doTask(Consumer &consumer)
 {
     SWSS_LOG_ENTER();
@@ -81,17 +170,14 @@ void PortMgr::doTask(Consumer &consumer)
 
         string alias = kfvKey(t);
         string op = kfvOp(t);
+        auto fvs = kfvFieldsValues(t);
 
         if (op == SET_COMMAND)
         {
-            if (!isPortStateOk(alias))
-            {
-                SWSS_LOG_INFO("Port %s is not ready, pending...", alias.c_str());
-                it++;
-                continue;
-            }
+            map <string, string> kernelsecttings;
 
-            string admin_status, mtu;
+            kernelsecttings["admin_status"] = "";
+            kernelsecttings["mtu"] = "";
 
             bool configured = (m_portList.find(alias) != m_portList.end());
 
@@ -100,37 +186,53 @@ void PortMgr::doTask(Consumer &consumer)
              */
             if (!configured)
             {
-                admin_status = DEFAULT_ADMIN_STATUS_STR;
-                mtu = DEFAULT_MTU_STR;
+                kernelsecttings["admin_status"] = DEFAULT_ADMIN_STATUS_STR;
+                kernelsecttings["mtu"] = DEFAULT_MTU_STR;
 
+                constructKernelSettings(kernelsecttings, fvs);
                 m_portList.insert(alias);
             }
 
-            for (auto i : kfvFieldsValues(t))
-            {
-                if (fvField(i) == "mtu")
-                {
-                    mtu = fvValue(i);
-                }
-                else if (fvField(i) == "admin_status")
-                {
-                    admin_status = fvValue(i);
-                }
-            }
+            // pass to appDB
+            m_appPortTable.set(alias, fvs);
 
-            if (!mtu.empty())
-            {
-                setPortMtu(alias, mtu);
-                SWSS_LOG_NOTICE("Configure %s MTU to %s", alias.c_str(), mtu.c_str());
-            }
+            // Save the settings to kernelsettingmap
+            // Get from fvs first if exists
+            getKernelSettingsFromFVS(kernelsecttings, fvs);
 
-            if (!admin_status.empty())
+            // If new kernel configurations exists and portstate is ok, apply it now
+            // Otherwise, it will be done in doKernelSettingTask()
+            if (saveKernelSettingsMap(alias, kernelsecttings))
             {
-                setPortAdminStatus(alias, admin_status == "up");
-                SWSS_LOG_NOTICE("Configure %s admin status to %s", alias.c_str(), admin_status.c_str());
+                if (isPortStateOk(alias))
+                {
+                    doConfigKernelSettings(alias, m_kernelSettingMap[alias]);
+                    m_kernelSettingMap.erase(alias);
+                }
             }
         }
 
         it = consumer.m_toSync.erase(it);
+    }
+}
+
+void PortMgr::doKernelSettingTask()
+{
+    SWSS_LOG_ENTER();
+
+    auto it = m_kernelSettingMap.begin();
+    while (it != m_kernelSettingMap.end())
+    {
+        string alias = it->first;
+        auto settings = it->second;
+
+        if (!isPortStateOk(alias))
+        {
+            SWSS_LOG_INFO("Port %s is not ready, retry later...", alias.c_str());
+            it++;
+            continue;
+        }
+        doConfigKernelSettings(alias, settings);
+        it = m_kernelSettingMap.erase(it);
     }
 }

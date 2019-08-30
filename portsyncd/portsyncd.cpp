@@ -43,7 +43,6 @@ void usage()
 void handlePortConfigFile(ProducerStateTable &p, string file, bool warm);
 bool handlePortConfigFromConfigDB(ProducerStateTable &p, DBConnector &cfgDb, bool warm);
 void handleVlanIntfFile(string file);
-void handlePortConfig(ProducerStateTable &p, map<string, KeyOpFieldsValuesTuple> &port_cfg_map);
 void checkPortInitDone(DBConnector *appl_db);
 
 int main(int argc, char **argv)
@@ -51,7 +50,6 @@ int main(int argc, char **argv)
     Logger::linkToDbNative("portsyncd");
     int opt;
     string port_config_file;
-    map<string, KeyOpFieldsValuesTuple> port_cfg_map;
 
     while ((opt = getopt(argc, argv, "p:v:h")) != -1 )
     {
@@ -103,7 +101,6 @@ int main(int argc, char **argv)
         NetDispatcher::getInstance().registerMessageHandler(RTM_DELLINK, &sync);
 
         s.addSelectable(&netlink);
-        s.addSelectable(&portCfg);
 
         while (true)
         {
@@ -135,29 +132,6 @@ int main(int argc, char **argv)
 
                     g_init = true;
                 }
-                if (!port_cfg_map.empty())
-                {
-                    handlePortConfig(p, port_cfg_map);
-                }
-            }
-
-            if (temps == (Selectable *)&portCfg)
-            {
-                std::deque<KeyOpFieldsValuesTuple> entries;
-                portCfg.pops(entries);
-
-                for (auto entry: entries)
-                {
-                    string key = kfvKey(entry);
-
-                    if (port_cfg_map.find(key) != port_cfg_map.end())
-                    {
-                        /* For now we simply drop previous pending port config */
-                        port_cfg_map.erase(key);
-                    }
-                    port_cfg_map[key] = entry;
-                }
-                handlePortConfig(p, port_cfg_map);
             }
         }
     }
@@ -313,31 +287,3 @@ void handlePortConfigFile(ProducerStateTable &p, string file, bool warm)
     }
 }
 
-void handlePortConfig(ProducerStateTable &p, map<string, KeyOpFieldsValuesTuple> &port_cfg_map)
-{
-
-    auto it = port_cfg_map.begin();
-    while (it != port_cfg_map.end())
-    {
-        KeyOpFieldsValuesTuple entry = it->second;
-        string key = kfvKey(entry);
-        string op  = kfvOp(entry);
-        auto values = kfvFieldsValues(entry);
-
-        /* only push down port config when port is not in hostif create pending state */
-        if (g_portSet.find(key) == g_portSet.end())
-        {
-            /* No support for port delete yet */
-            if (op == SET_COMMAND)
-            {
-                p.set(key, values);
-            }
-
-            it = port_cfg_map.erase(it);
-        }
-        else
-        {
-            it++;
-        }
-    }
-}

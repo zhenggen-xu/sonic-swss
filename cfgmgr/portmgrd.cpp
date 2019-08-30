@@ -73,6 +73,7 @@ int main(int argc, char **argv)
             if (ret == Select::TIMEOUT)
             {
                 portmgr.doTask();
+                portmgr.doKernelSettingTask();
                 continue;
             }
 
