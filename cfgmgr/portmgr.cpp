@@ -28,13 +28,6 @@ bool PortMgr::setPortMtu(const string &alias, const string &mtu)
     cmd << IP_CMD << " link set dev " << alias << " mtu " << mtu;
     EXEC_WITH_ERROR_THROW(cmd.str(), res);
 
-    // Set the port MTU in application database to update both
-    // the port MTU and possibly the port based router interface MTU
-    vector<FieldValueTuple> fvs;
-    FieldValueTuple fv("mtu", mtu);
-    fvs.push_back(fv);
-    m_appPortTable.set(alias, fvs);
-
     return true;
 }
 
@@ -46,11 +39,6 @@ bool PortMgr::setPortAdminStatus(const string &alias, const bool up)
     // ip link set dev <port_name> [up|down]
     cmd << IP_CMD << " link set dev " << alias << (up ? " up" : " down");
     EXEC_WITH_ERROR_THROW(cmd.str(), res);
-
-    vector<FieldValueTuple> fvs;
-    FieldValueTuple fv("admin_status", (up ? "up" : "down"));
-    fvs.push_back(fv);
-    m_appPortTable.set(alias, fvs);
 
     return true;
 }
@@ -81,9 +69,24 @@ void PortMgr::doTask(Consumer &consumer)
 
         string alias = kfvKey(t);
         string op = kfvOp(t);
+		auto fvs = kfvFieldsValues(t);
+
+        map<string, bool> appdb_set;
+        appdb_set[alias] = false;
 
         if (op == SET_COMMAND)
         {
+            /* Pass the configurations to appDB */
+            if (!appdb_set[alias])
+            {
+                m_appPortTable.set(alias, fvs);
+                appdb_set[alias] = true;
+                for (auto fv: fvs)
+                    SWSS_LOG_INFO("set appDB with fvs: \tfield: %s value: %s",
+                        fvField(fv).c_str(), fvValue(fv).c_str());
+                //default mtu and admin status----TBD
+            }
+
             if (!isPortStateOk(alias))
             {
                 SWSS_LOG_INFO("Port %s is not ready, pending...", alias.c_str());
@@ -129,6 +132,12 @@ void PortMgr::doTask(Consumer &consumer)
                 setPortAdminStatus(alias, admin_status == "up");
                 SWSS_LOG_NOTICE("Configure %s admin status to %s", alias.c_str(), admin_status.c_str());
             }
+        }
+        else if (op == DEL_COMMAND)
+        {
+            SWSS_LOG_NOTICE("Delete Port: %s", alias.c_str());
+            m_appPortTable.del(alias);
+            m_portList.erase(alias);
         }
 
         it = consumer.m_toSync.erase(it);

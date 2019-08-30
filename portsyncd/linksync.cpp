@@ -228,10 +228,11 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     vector<FieldValueTuple> temp;
     if (m_portTable.get(key, temp))
     {
-        /* TODO: When port is removed from the kernel */
+        /* Clear statePortTable when port is removed from the kernel */
         if (nlmsg_type == RTM_DELLINK)
         {
-            return;
+            m_statePortTable.del(key);
+            SWSS_LOG_NOTICE("Delete %s(ok) from state db", key.c_str());
         }
 
         /* Host interface is created */
