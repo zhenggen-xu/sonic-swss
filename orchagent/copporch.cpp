@@ -73,6 +73,8 @@ static map<string, sai_hostif_trap_type_t> trap_id_map = {
     {"udld", SAI_HOSTIF_TRAP_TYPE_UDLD},
     {"bfd", SAI_HOSTIF_TRAP_TYPE_BFD},
     {"bfdv6", SAI_HOSTIF_TRAP_TYPE_BFDV6}
+    {"src_nat_miss", SAI_HOSTIF_TRAP_TYPE_SNAT_MISS},
+    {"dest_nat_miss", SAI_HOSTIF_TRAP_TYPE_DNAT_MISS}
 };
 
 static map<string, sai_packet_action_t> packet_action_map = {

@@ -404,6 +404,11 @@ bool IntfMgr::doIntfGeneralTask(const vector<string>& keys,
         {
             adminStatus = value;
         }
+
+        if (field == "nat_zone")
+        {
+            nat_zone = value;
+        }
     }
 
     if (op == SET_COMMAND)
@@ -430,6 +435,15 @@ bool IntfMgr::doIntfGeneralTask(const vector<string>& keys,
         if (is_lo)
         {
             addLoopbackIntf(alias);
+        }
+        else
+        {
+            /* Set nat zone */
+            if (!nat_zone.empty())
+            {
+                FieldValueTuple fvTuple("nat_zone", nat_zone);
+                data.push_back(fvTuple);
+            }
         }
 
         if (!vrf_name.empty())
