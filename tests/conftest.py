@@ -320,6 +320,20 @@ class DockerVirtualSwitch(object):
             cmd += "supervisorctl start {}; ".format(pname)
         self.runcmd(['sh', '-c', cmd])
 
+    #stop add daemons
+    def stop_all_daemons(self):
+        cmd = ""
+        for pname in self.alld:
+            cmd += "supervisorctl stop {}; ".format(pname)
+        self.runcmd(['sh', '-c', cmd])
+
+    #start all daemons
+    def start_all_daemons(self):
+        cmd = ""
+        for pname in self.alld:
+            cmd += "supervisorctl start {}; ".format(pname)
+        self.runcmd(['sh', '-c', cmd])
+
     # stop processes in SWSS
     def stop_swss(self):
         cmd = ""
@@ -349,6 +363,9 @@ class DockerVirtualSwitch(object):
 
     def init_asicdb_validator(self):
         self.asicdb = AsicDbValidator(self)
+
+    def flush_appdb(self):
+        self.runcmd(['sh', '-c', 'redis-cli -n 0 FLUSHDB'])
 
     def runcmd(self, cmd):
         res = self.ctn.exec_run(cmd)
