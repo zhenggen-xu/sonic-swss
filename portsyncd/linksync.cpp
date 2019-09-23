@@ -233,6 +233,7 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
         {
             m_statePortTable.del(key);
             SWSS_LOG_NOTICE("Delete %s(ok) from state db", key.c_str());
+            return;
         }
 
         /* Host interface is created */
