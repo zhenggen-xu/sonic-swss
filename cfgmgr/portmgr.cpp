@@ -168,7 +168,7 @@ void PortMgr::doTask(Consumer &consumer)
 
         string alias = kfvKey(t);
         string op = kfvOp(t);
-		auto fvs = kfvFieldsValues(t);
+        auto fvs = kfvFieldsValues(t);
 
         if (op == SET_COMMAND)
         {
@@ -209,12 +209,6 @@ void PortMgr::doTask(Consumer &consumer)
                     m_kernelSettingMap.erase(alias);
                 }
             }
-        }
-        else if (op == DEL_COMMAND)
-        {
-            SWSS_LOG_NOTICE("Delete Port: %s", alias.c_str());
-            m_appPortTable.del(alias);
-            m_portList.erase(alias);
         }
 
         it = consumer.m_toSync.erase(it);
