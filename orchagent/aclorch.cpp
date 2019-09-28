@@ -2913,6 +2913,11 @@ sai_object_id_t AclOrch::getTableById(string table_id)
 {
     SWSS_LOG_ENTER();
 
+    if (table_id.empty())
+    {
+        return SAI_NULL_OBJECT_ID;
+    }
+
     for (auto it : m_AclTables)
     {
         if (it.second.id == table_id)
