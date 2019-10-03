@@ -38,9 +38,14 @@ def my_fixture(dvs):
     dvs.stop_all_daemons()
     dvs.runcmd(start_cmd)
 
+'''
 @pytest.mark.skip("Skipping for now")
+'''
 @pytest.mark.usefixtures('my_fixture')
 class TestPortDPB(object):
+    def getPortOid(self, dvs, port_name):
+        cnt_r = redis.Redis(unix_socket_path=dvs.redis_sock, db=swsscommon.COUNTERS_DB)
+        return cnt_r.hget("COUNTERS_PORT_NAME_MAP", port_name);
   
     def test_sample1(self):
         print "From test_sample1"
@@ -64,18 +69,15 @@ class TestPortDPB(object):
             print "Delete %s" %(k)
             cfg_db_port_table._del(k)
 
-        print "Wait for 10 seconds"
-        time.sleep(10)
-
         print "Delete all net devices"
         for i in range(0, len(ports)):
-            time.sleep(2)
             intf = ports[i]
             cmd = "ip link delete " + intf 
             print cmd
             dvs.runcmd(cmd)
 
         print "Breakout: Use the saved port info to create child ports"
+        child_ports= []
         for k, fvs in ports_info.items():
             alias_str = fvs[0][1]
             lanes_str = fvs[1][1]
@@ -107,5 +109,38 @@ class TestPortDPB(object):
                                                   ("index", child_index_str)])
                 child_port = "Ethernet%d"%(port_num+offset)
                 cfg_db_port_table.set(child_port, fvs)
+                child_ports.append(child_port)
+
+        time.sleep(5)
+        print "Verification"
         import pdb
         pdb.set_trace()
+        app_db = swsscommon.DBConnector(swsscommon.APPL_DB, dvs.redis_sock, 0)
+        app_db_ptbl = swsscommon.Table(app_db, swsscommon.APP_PORT_TABLE_NAME)
+        for pname in child_ports:
+            (status, fv) = app_db_ptbl.get(pname)
+            assert status == True
+        print "APP DB check passed"
+
+        import pdb
+        pdb.set_trace()
+        asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
+        asic_db_ptbl = swsscommon.Table(asic_db, "ASIC_STATE:SAI_OBJECT_TYPE_PORT")
+        for pname in child_ports:
+            port_oid = self.getPortOid(dvs, pname)
+            (status, fv) = asic_db_ptbl.get(port_oid)
+            assert status == True
+        print "ASIC DB check passed"
+
+
+        import pdb
+        pdb.set_trace()
+        print "Delete all kernel interfaces of child ports" 
+        for child_port in child_ports:
+            cmd = "ip link delete " + child_port 
+            print cmd
+            dvs.runcmd(cmd)
+
+        import pdb
+        pdb.set_trace()
+
