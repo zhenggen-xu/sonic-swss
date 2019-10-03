@@ -111,10 +111,8 @@ class TestPortDPB(object):
                 cfg_db_port_table.set(child_port, fvs)
                 child_ports.append(child_port)
 
-        time.sleep(5)
+        time.sleep(1)
         print "Verification"
-        import pdb
-        pdb.set_trace()
         app_db = swsscommon.DBConnector(swsscommon.APPL_DB, dvs.redis_sock, 0)
         app_db_ptbl = swsscommon.Table(app_db, swsscommon.APP_PORT_TABLE_NAME)
         for pname in child_ports:
@@ -122,8 +120,7 @@ class TestPortDPB(object):
             assert status == True
         print "APP DB check passed"
 
-        import pdb
-        pdb.set_trace()
+        time.sleep(5)
         asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
         asic_db_ptbl = swsscommon.Table(asic_db, "ASIC_STATE:SAI_OBJECT_TYPE_PORT")
         for pname in child_ports:
@@ -133,14 +130,9 @@ class TestPortDPB(object):
         print "ASIC DB check passed"
 
 
-        import pdb
-        pdb.set_trace()
         print "Delete all kernel interfaces of child ports" 
         for child_port in child_ports:
             cmd = "ip link delete " + child_port 
             print cmd
             dvs.runcmd(cmd)
-
-        import pdb
-        pdb.set_trace()
 
