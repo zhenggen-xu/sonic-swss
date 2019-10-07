@@ -1,11 +1,18 @@
 from swsscommon import swsscommon
 import time
 
+
 default_app_mtu = "9100"
 default_asic_mtu = "9122"
-default_admin_status = "DOWN"
+default_admin_status = "down"
+default_asic_admin_status = "false"
 
 class TestPortConfigChanges(object):
+
+    admin_status_app2asic_map = {
+        "down" : "false",
+        "up" : "true"
+    }
 
     def setup_db(self, dvs):
         self.pdb = swsscommon.DBConnector(0, dvs.redis_sock, 0)
@@ -20,18 +27,18 @@ class TestPortConfigChanges(object):
             if fv[0] == field:
                 assert fv[1] == value
 
-    def check_kernel_mtu(self, port, mtu_value):
+    def check_kernel_mtu(self, dvs, port, mtu_value):
         mtu_loc = "/sys/class/net/{}/mtu".format(port)
         exit_code, mtu = dvs.runcmd(['sh', '-c', 'cat {}'.format(mtu_loc)])
-        assert exit_code.strip() == "0"
+        assert exit_code == 0
         assert mtu.strip() == mtu_value
 
-    def check_kernel_admin_status(self, port, admin_status_value):
+    def check_kernel_admin_status(self, dvs, port, admin_status_value):
         assert admin_status_value == "up" or admin_status_value == "down"
-        cmd = "ip link show {} up"
-        exit_code, output = dvs.runcmd(['sh', '-c', cmd)
-        assert exit_code.strip() == "0"
-        if admin_status_value == up:
+        cmd = "ip link show {} up".format(port)
+        exit_code, output = dvs.runcmd(['sh', '-c', cmd])
+        assert exit_code == 0
+        if admin_status_value == "up":
             assert output.strip() != ""
         else:
             assert output.strip() == ""
@@ -58,7 +65,7 @@ class TestPortConfigChanges(object):
             "SAI_PORT_ATTR_MTU", default_asic_mtu)
 
             # Check kernel settings
-            self.check_kernel_mtu(port, default_app_mtu)
+            self.check_kernel_mtu(dvs, port, default_app_mtu)
 
     def test_PortDefaultAdminStatus(self, dvs):
         self.setup_db(dvs)
@@ -78,11 +85,12 @@ class TestPortConfigChanges(object):
 
             # check asic table values
             port_oid = dvs.asicdb.portnamemap[port]
+
             self.check_table_key_field_value(asic_port_tbl, port_oid, \
-            "SAI_PORT_ATTR_ADMIN_STATE", default_admin_status)
+            "SAI_PORT_ATTR_ADMIN_STATE", default_asic_admin_status)
 
             # Check kernel settings
-            self.check_kernel_admin_status(port, default_admin_status)
+            self.check_kernel_admin_status(dvs, port, default_admin_status)
 
     def test_PortConfigChanges(self, dvs):
         self.setup_db(dvs)
@@ -94,13 +102,14 @@ class TestPortConfigChanges(object):
         state_port_tbl = swsscommon.Table(self.sdb, "PORT_TABLE")
 
         # test case 1, MTU changes for Ethernet0/2
-        ports = ["Ethernet0", "Etherent4"]
+        ports = ["Ethernet0", "Ethernet4"]
         mtu_value = "1500"
-        mtu_asic_value = str(int(mtu_asic_value) + 22)
+        mtu_asic_value = str(int(mtu_value) + 22)
         fvs = swsscommon.FieldValuePairs([("mtu", mtu_value)])
 
         for port in ports:
             cfg_tbl.set(port, fvs)
+            time.sleep(2)
 
             # checck app table values
             self.check_table_key_field_value(app_port_tbl, port, \
@@ -112,15 +121,17 @@ class TestPortConfigChanges(object):
             "SAI_PORT_ATTR_MTU", mtu_asic_value)
 
             # Check kernel settings
-            self.check_kernel_mtu(port, mtu_value)
+            self.check_kernel_mtu(dvs, port, mtu_value)
 
         # test case 2: Check admin_status changes
-        ports = ["Ethernet0", "Etherent4"]
+        ports = ["Ethernet0", "Ethernet4"]
         admin_status = "up"
+        asic_admin_status = "true"
         fvs = swsscommon.FieldValuePairs([("admin_status", admin_status)])
 
         for port in ports:
             cfg_tbl.set(port, fvs)
+            time.sleep(2)
 
             # checck app table values
             self.check_table_key_field_value(app_port_tbl, port, \
@@ -129,13 +140,13 @@ class TestPortConfigChanges(object):
             # check asic table values
             port_oid = dvs.asicdb.portnamemap[port]
             self.check_table_key_field_value(asic_port_tbl, port_oid, \
-            "SAI_PORT_ATTR_ADMIN_STATE", admin_status)
+            "SAI_PORT_ATTR_ADMIN_STATE", asic_admin_status)
 
             # Check kernel settings
-            self.check_kernel_admin_status(port, admin_status)
+            self.check_kernel_admin_status(dvs, port, admin_status)
 
         # test case 3: apply MTU multiple times, it should match the last one
-        ports = ["Ethernet0", "Etherent4"]
+        ports = ["Ethernet0", "Ethernet4"]
         for port in ports:
             mtu_value = "1500"
             fvs = swsscommon.FieldValuePairs([("mtu", mtu_value)])
@@ -146,10 +157,10 @@ class TestPortConfigChanges(object):
             cfg_tbl.set(port, fvs)
 
             mtu_value = "1700"
-            mtu_asic_value = str(int(mtu_asic_value) + 22)
+            mtu_asic_value = str(int(mtu_value) + 22)
             fvs = swsscommon.FieldValuePairs([("mtu", mtu_value)])
             cfg_tbl.set(port, fvs)
-            time.sleep(1)
+            time.sleep(2)
 
             # checck app table values
             self.check_table_key_field_value(app_port_tbl, port, \
@@ -161,17 +172,17 @@ class TestPortConfigChanges(object):
             "SAI_PORT_ATTR_MTU", mtu_asic_value)
 
             # Check kernel settings
-            self.check_kernel_mtu(port, mtu_value)
+            self.check_kernel_mtu(dvs, port, mtu_value)
 
         # test case 4:
         # Clear stateDB, change MTU multiple times, kernel should not be updated
         # Set stateDB, kernel is updated with the last one
-        ports = ["Ethernet8", "Etherent12"]
+        ports = ["Ethernet8", "Ethernet12"]
 
         globle_mtu_value = ""
         for port in ports:
             # clear StateDB
-            state_port_tbl.del(port)
+            state_port_tbl._del(port)
 
             mtu_value = "1500"
             fvs = swsscommon.FieldValuePairs([("mtu", mtu_value)])
@@ -182,11 +193,11 @@ class TestPortConfigChanges(object):
             cfg_tbl.set(port, fvs)
 
             mtu_value = "1700"
-            mtu_asic_value = str(int(mtu_asic_value) + 22)
+            mtu_asic_value = str(int(mtu_value) + 22)
             fvs = swsscommon.FieldValuePairs([("mtu", mtu_value)])
             globle_mtu_value = mtu_value
             cfg_tbl.set(port, fvs)
-            time.sleep(1)
+            time.sleep(2)
 
             # checck app table values
             self.check_table_key_field_value(app_port_tbl, port, \
@@ -198,7 +209,7 @@ class TestPortConfigChanges(object):
             "SAI_PORT_ATTR_MTU", mtu_asic_value)
 
             # Check kernel settings, still default
-            self.check_kernel_mtu(port, default_app_mtu)
+            self.check_kernel_mtu(dvs, port, default_app_mtu)
 
         fvs = swsscommon.FieldValuePairs([("state", "ok")])
         for port in ports:
@@ -207,28 +218,31 @@ class TestPortConfigChanges(object):
 
         time.sleep(2)
 
-        for port in ports
+        for port in ports:
             # Check kernel settings
-            self.check_kernel_mtu(port, globle_mtu_value)
+            self.check_kernel_mtu(dvs, port, globle_mtu_value)
 
         # test case 5:
         # Clear StateDB, apply MTU, then admin_status. kernel should not be updated
         # Set StateDB, both kernel settings should be applied.
-        ports = ["Ethernet16", "Etherent20"]
+        ports = ["Ethernet16", "Ethernet20"]
         mtu_value = "1500"
-        mtu_asic_value = str(int(mtu_asic_value) + 22)
+        mtu_asic_value = str(int(mtu_value) + 22)
         i = 0
         for i, port in enumerate(ports):
             # clear StateDB
-            state_port_tbl.del(port)
+            state_port_tbl._del(port)
 
             # admin_status changing for ports
             if i%2 == 0:
                 admin_status = "up"
+                asic_admin_status = "true"
             else:
                 admin_status = "down"
+                asic_admin_status = "false"
 
-            fvs = swsscommon.FieldValuePairs([("mtu", mtu_value), "admin_status", admin_status])
+            fvs = swsscommon.FieldValuePairs([("mtu", mtu_value), \
+            ("admin_status", admin_status)])
             cfg_tbl.set(port, fvs)
             time.sleep(2)
 
@@ -245,11 +259,11 @@ class TestPortConfigChanges(object):
             "SAI_PORT_ATTR_MTU", mtu_asic_value)
 
             self.check_table_key_field_value(asic_port_tbl, port_oid, \
-            "SAI_PORT_ATTR_ADMIN_STATE", admin_status)
+            "SAI_PORT_ATTR_ADMIN_STATE", asic_admin_status)
 
             # Check kernel settings, still default
-            self.check_kernel_mtu(port, default_app_mtu)
-            self.check_kernel_admin_status(port, default_admin_status)
+            self.check_kernel_mtu(dvs, port, default_app_mtu)
+            self.check_kernel_admin_status(dvs, port, default_admin_status)
 
         fvs = swsscommon.FieldValuePairs([("state", "ok")])
         for port in ports:
@@ -266,6 +280,15 @@ class TestPortConfigChanges(object):
                 admin_status = "down"
 
             # Check kernel settings
-            self.check_kernel_mtu(port, mtu_value)
-            self.check_kernel_admin_status(port, admin_status)
+            self.check_kernel_mtu(dvs, port, mtu_value)
+            self.check_kernel_admin_status(dvs, port, admin_status)
 
+        # revert everything to default mtu, admin_status
+        ports = cfg_tbl.getKeys()
+        for port in ports:
+            fvs = swsscommon.FieldValuePairs([("mtu", default_app_mtu), \
+            ("admin_status", default_admin_status)])
+            cfg_tbl.set(port, fvs)
+
+        self.test_PortDefaultMTU(dvs)
+        self.test_PortDefaultAdminStatus(dvs)
