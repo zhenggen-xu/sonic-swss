@@ -43,7 +43,6 @@ void usage()
 void handlePortConfigFile(ProducerStateTable &p, string file, bool warm);
 bool handlePortConfigFromConfigDB(ProducerStateTable &p, DBConnector &cfgDb, bool warm);
 void handleVlanIntfFile(string file);
-//void handlePortConfig(ProducerStateTable &p, map<string, KeyOpFieldsValuesTuple> &port_cfg_map);
 void checkPortInitDone(DBConnector *appl_db);
 
 int main(int argc, char **argv)

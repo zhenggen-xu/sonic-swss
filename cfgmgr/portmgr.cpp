@@ -56,8 +56,8 @@ bool PortMgr::isPortStateOk(const string &alias)
     return false;
 }
 
-// This function set the default value of the keysetting field to
-// fvs if the field does not exist in fvs
+// This function set the default value of the kernelsettings' field
+// to fvs if the field does not exist in fvs
 void PortMgr::constructKernelSettings(const KernelSettingMap &kernelsettings,
   vector<FieldValueTuple> &fvs)
 {
@@ -84,7 +84,7 @@ void PortMgr::constructKernelSettings(const KernelSettingMap &kernelsettings,
     return;
 }
 
-// Get kernel settins from fvs if exist
+// Get kernel settings from fvs if exist
 void PortMgr::getKernelSettingsFromFVS(KernelSettingMap &kernelsettings,
   const vector<FieldValueTuple> &fvs)
 {
@@ -172,7 +172,6 @@ void PortMgr::doTask(Consumer &consumer)
 
         if (op == SET_COMMAND)
         {
-            //string admin_status, mtu;
             map <string, string> kernelsecttings;
 
             kernelsecttings["admin_status"] = "";
