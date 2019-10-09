@@ -281,8 +281,8 @@ class TestAcl(object):
 
         atbl = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
         keys = atbl.getKeys()
-        # only the default table was left along with DTel tables
-        assert len(keys) >= 1
+        # default no tables
+        assert len(keys) == 0
 
     def test_V6AclTableCreation(self, dvs, testlog):
 
@@ -920,8 +920,8 @@ class TestAcl(object):
 
         atbl = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
         keys = atbl.getKeys()
-        # only the default table was left
-        assert len(keys) >= 1
+        # no table by default
+        assert len(keys) == 0
 
     #helper function to verify if rule exists
     def check_rule_existence(self, entry, rules, verifs):
@@ -1034,8 +1034,8 @@ class TestAcl(object):
 
         atbl = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
         keys = atbl.getKeys()
-        # only the default table was left
-        assert len(keys) >= 1
+        # no tables by default
+        assert len(keys) == 0
 
     def test_RulesWithDiffMaskLengths(self, dvs, testlog):
         self.setup_db(dvs)
@@ -1121,7 +1121,8 @@ class TestAcl(object):
 
         atbl = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
         keys = atbl.getKeys()
-        assert len(keys) >= 1
+        # no tables by default
+        assert len(keys) == 0
 
     def create_acl_rule(self, table, rule, field, value):
         tbl = swsscommon.Table(self.cdb, "ACL_RULE")
