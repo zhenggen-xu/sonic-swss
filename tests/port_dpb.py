@@ -86,10 +86,11 @@ class Port():
         print "Port: %s Lanes: %s Speed: %d, Index: %d"%(self._name, self._lanes, self._speed, self._index) 
 
     def port_merge(self, child_ports):
-        child_ports.sort(key=lambda x: x._port_num, reverse=True)
+        child_ports.sort(key=lambda x: x.get_port_num())
         self.set_name(child_ports[0].get_name())
         self.set_speed(child_ports[0].get_speed() * len(child_ports))
         self.set_alias(child_ports[0].get_alias().rsplit(',',1)[0])
+        self.set_index(child_ports[0].get_index())
         lanes =[]
         for cp in child_ports:
             for l in cp.get_lanes():
