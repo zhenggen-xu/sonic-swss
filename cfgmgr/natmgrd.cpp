@@ -61,22 +61,22 @@ void sigterm_handler(int signo)
 {
     int ret = 0;
     std::string res;
-    const std::string iptablesFlushPreRouting   = "iptables -t nat -F PREROUTING";
-    const std::string iptablesFlushPostRouting  = "iptables -t nat -F POSTROUTING";
+    const std::string iptablesFlushNat          = "iptables -t nat -F";
+    const std::string iptablesFlushMangle       = "iptables -t mangle -F";
     const std::string conntrackFlush            = "conntrack -F";
 
     SWSS_LOG_NOTICE("Got SIGTERM");
 
     /*If there are any iptables and conntrack entries, clean them */
-    ret = swss::exec(iptablesFlushPreRouting, res);
+    ret = swss::exec(iptablesFlushNat, res);
     if (ret)
     {
-        SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushPreRouting.c_str(), ret);
+        SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushNat.c_str(), ret);
     }
-    ret = swss::exec(iptablesFlushPostRouting, res);
+    ret = swss::exec(iptablesFlushMangle, res);
     if (ret)
     {
-        SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushPreRouting.c_str(), ret);
+        SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushMangle.c_str(), ret);
     }
     ret = swss::exec(conntrackFlush, res);
     if (ret)
@@ -118,6 +118,7 @@ int main(int argc, char **argv)
             CFG_INTF_TABLE_NAME,
             CFG_LAG_INTF_TABLE_NAME,
             CFG_VLAN_INTF_TABLE_NAME,
+            CFG_LOOPBACK_INTERFACE_TABLE_NAME,
             CFG_ACL_TABLE_NAME,
             CFG_ACL_RULE_TABLE_NAME
         };

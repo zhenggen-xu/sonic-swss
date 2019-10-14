@@ -41,6 +41,7 @@ NatMgr::NatMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, con
         m_cfgInterfaceTable(cfgDb, CFG_INTF_TABLE_NAME),
         m_cfgLagInterfaceTable(cfgDb, CFG_LAG_INTF_TABLE_NAME),
         m_cfgVlanInterfaceTable(cfgDb, CFG_VLAN_INTF_TABLE_NAME),
+        m_cfgLoopbackInterfaceTable(cfgDb, CFG_LOOPBACK_INTERFACE_TABLE_NAME),
         m_cfgNatAclTable(cfgDb, CFG_ACL_TABLE_NAME),
         m_cfgNatAclRuleTable(cfgDb, CFG_ACL_RULE_TABLE_NAME),
         m_statePortTable(stateDb, STATE_PORT_TABLE_NAME),
@@ -616,7 +617,7 @@ void NatMgr::deleteConntrackDynamicEntries(const string &ip_range)
 
         SWSS_LOG_INFO("Delete dynamic conntrack entry with translated-src-ip %s", ipAddr);
 
-        cmds = (std::string("") + CONNTRACK_CMD + " -D -q " + ipAddrString);
+        cmds = (std::string("") + CONNTRACK_CMD + " -D -q " + ipAddrString + " &> /dev/null");
 
         int ret = swss::exec(cmds, res);
 
@@ -631,8 +632,44 @@ void NatMgr::deleteConntrackDynamicEntries(const string &ip_range)
     }
 }
 
+/* Iptable rules are added in the mangles table, to support use of Loopback IP as NAT Public IP which is a typical use-case in DC scenarios. The way it works is that:
+ *
+ * *	The mangle table rules are processed first before the nat table rules.
+ * *	Assign mark field on the packet using the mangles rules in the PREROUTING (ingress) and POSTROUTING (egress) stages.
+ * *	The mark field is derived from the configured zone (zone + 1). Using 'mark'value of 0 has issues as that is implicit value for any packet traversing the kernel.
+ * *	Match against the 'mark' value in the nat rules happens after the 'mangle' rule sets it.
+ * *	Since packet doesn't go out of a Loopback interface, we configure zone value on the public interfaces same as on the Loopback interface (whose IP is used as NAT public IP).
+ * *	So matching against the zone value is done while allocating NAT IPs.
+ * *
+ * * */
+bool NatMgr::setMangleIptablesRules(const string &opCmd, const string &interface, const string &nat_zone)
+{
+    SWSS_LOG_ENTER();
+
+    /* The command should be generated as:
+     * iptables -t mangle -opCmd PREROUTING -i port -j MARK --set-mark nat_zone
+     * iptables -t mangle -opCmd POSTROUTING -o port -j MARK --set-mark nat_zone
+     */
+    std::string res;
+    int ret;
+
+    const std::string cmds = std::string("")
+          + IPTABLES_CMD + " -t mangle " + "-" + opCmd + " PREROUTING -i " + interface + " -j MARK --set-mark " + nat_zone + " && "
+          + IPTABLES_CMD + " -t mangle " + "-" + opCmd + " POSTROUTING -o " + interface + " -j MARK --set-mark " + nat_zone ;
+
+    ret = swss::exec(cmds, res);
+
+    if (ret)
+    {
+        SWSS_LOG_ERROR("Command '%s' failed with rc %d", cmds.c_str(), ret);
+        return false;
+    }
+
+    return true;
+}
+
 /* To Add arbitrary value for DNAT rule incase of fullcone */
-bool NatMgr::setFullConeDnatRule(const string &opCmd)
+bool NatMgr::setFullConeDnatIptablesRule(const string &opCmd)
 {
     /* This rule in the PREROUTING chain should be the default rule at the end of the list
      * iptables -t nat -[A/D] PREROUTING -j DNAT --fullcone
@@ -665,13 +702,25 @@ bool NatMgr::setStaticNatIptablesRules(const string &opCmd, const string &interf
      * iptables -t nat -opCmd POSTROUTING -o port -j SNAT -s internal_ip --to-source external_ip
      */
     std::string res;
+    std::string preIntfStr = std::string(""), postIntfStr = std::string("");
     int ret;
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        preIntfStr = " -i " + interface;
+        postIntfStr = " -o " + interface;
+    }
+    else
+    {
+        preIntfStr = postIntfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     if (nat_type == DNAT_NAT_TYPE)
     {
         const std::string cmds = std::string("")
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -i " + interface + " -j DNAT -d " + external_ip + " --to-destination " + internal_ip + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -o " + interface + " -j SNAT -s " + internal_ip + " --to-source " + external_ip ;
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING " + preIntfStr + " -j DNAT -d " + external_ip + " --to-destination " + internal_ip + " && "
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + postIntfStr + " -j SNAT -s " + internal_ip + " --to-source " + external_ip ;
         
         ret = swss::exec(cmds, res);
 
@@ -710,14 +759,26 @@ bool NatMgr::setStaticNaptIptablesRules(const string &opCmd, const string &inter
      * iptables -t nat -opCmd POSTROUTING -o port -p prototype -j SNAT -s internal_ip --sport internal_port --to-source external_ip:external_port
      */
     std::string res;
+    std::string preIntfStr = std::string(""), postIntfStr = std::string("");
     int ret;
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        preIntfStr = " -i " + interface;
+        postIntfStr = " -o " + interface;
+    }
+    else
+    {
+        preIntfStr = postIntfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     if (nat_type == DNAT_NAT_TYPE)
     {
         const std::string cmds = std::string("")
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -i " + interface + " -p " + prototype + " -j DNAT -d " + external_ip + " --dport " + external_port + " --to-destination " 
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING " + preIntfStr + " -p " + prototype + " -j DNAT -d " + external_ip + " --dport " + external_port + " --to-destination " 
           + internal_ip + ":" + internal_port + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -o " + interface + " -p " + prototype + " -j SNAT -s " + internal_ip + " --sport " + internal_port + " --to-source " 
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + postIntfStr + " -p " + prototype + " -j SNAT -s " + internal_ip + " --sport " + internal_port + " --to-source " 
           + external_ip + ":" + external_port;
 
         ret = swss::exec(cmds, res);
@@ -763,16 +824,28 @@ bool NatMgr::setStaticTwiceNatIptablesRules(const string &opCmd, const string &i
      */
 
     std::string res;
+    std::string preIntfStr = std::string(""), postIntfStr = std::string("");
     int ret;
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        preIntfStr = " -i " + interface;
+        postIntfStr = " -o " + interface;
+    }
+    else
+    {
+        preIntfStr = postIntfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     const std::string cmds = std::string("")
           + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -j DNAT -d " + translated_src_ip
           + " --to-destination " + src_ip + " -s " + translated_dest_ip + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -i " + interface + " -j DNAT -d " + dest_ip
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING " + preIntfStr + " -j DNAT -d " + dest_ip
           + " --to-destination " + translated_dest_ip + " -s " + src_ip + " && "
           + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -j SNAT -s " + src_ip
           + " --to-source " + translated_src_ip + " -d " + translated_dest_ip + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -o " + interface + " -j SNAT -s " + translated_dest_ip
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + postIntfStr + " -j SNAT -s " + translated_dest_ip
           + " --to-source " + dest_ip + " -d " + src_ip;
 
     ret = swss::exec(cmds, res);
@@ -806,16 +879,28 @@ bool NatMgr::setStaticTwiceNaptIptablesRules(const string &opCmd, const string &
      */
 
     std::string res;
+    std::string preIntfStr = std::string(""), postIntfStr = std::string("");
     int ret;
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        preIntfStr = " -i " + interface;
+        postIntfStr = " -o " + interface;
+    }
+    else
+    {
+        preIntfStr = postIntfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     const std::string cmds = std::string("")
           + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -p " + prototype + " -j DNAT -d " + translated_src_ip + " --dport " + translated_src_port 
           + " --to-destination " + src_ip + ":" + src_port + " -s " + translated_dest_ip + " --sport " + translated_dest_port + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING -i " + interface + " -p " + prototype + " -j DNAT -d " + dest_ip + " --dport " + dest_port
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " PREROUTING " + preIntfStr + " -p " + prototype + " -j DNAT -d " + dest_ip + " --dport " + dest_port
           + " --to-destination " + translated_dest_ip + ":" + translated_dest_port + " -s " + src_ip + " --sport " + src_port + " && "
           + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p " + prototype + " -j SNAT -s " + src_ip + " --sport " + src_port
           + " --to-source " + translated_src_ip + ":" + translated_src_port + " -d " + translated_dest_ip + " --dport " + translated_dest_port + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -o " + interface + " -p " + prototype + " -j SNAT -s " + translated_dest_ip + " --sport " + translated_dest_port
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + postIntfStr + " -p " + prototype + " -j SNAT -s " + translated_dest_ip + " --sport " + translated_dest_port
           + " --to-source " + dest_ip + ":" + dest_port + " -d " + src_ip + " --dport " +src_port;
 
     ret = swss::exec(cmds, res);
@@ -846,6 +931,17 @@ bool NatMgr::setDynamicNatIptablesRulesWithoutAcl(const string &opCmd, const str
     std::string fullcone = EMPTY_STRING;
     std::string prototype = EMPTY_STRING;
     std::string cmds = std::string("");
+    std::string intfStr = std::string("");
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        intfStr = " -o " + interface;
+    }
+    else
+    {
+        intfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     if (external_port_range.empty())
     {
@@ -862,11 +958,11 @@ bool NatMgr::setDynamicNatIptablesRulesWithoutAcl(const string &opCmd, const str
     {
         /* Rules for Single NAT */
         cmds = std::string("")
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p tcp -j SNAT -o " + interface + " --to-source " 
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p tcp -j SNAT " + intfStr + " --to-source " 
           + externalString + fullcone + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p udp -j SNAT -o " + interface + " --to-source " 
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p udp -j SNAT " + intfStr + " --to-source " 
           + externalString + fullcone + " && "
-          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p icmp -j SNAT -o " + interface + " --to-source " 
+          + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p icmp -j SNAT " + intfStr + " --to-source " 
           + externalString + fullcone;
     }
     else
@@ -894,7 +990,7 @@ bool NatMgr::setDynamicNatIptablesRulesWithoutAcl(const string &opCmd, const str
 
             /* Rules for Double NAT */
             cmds = std::string("")
-              + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT -o " + interface + " --to-source "
+              + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT " + intfStr + " --to-source "
               + externalString + " -d " + keys[0] + " --dport " + keys[2] + fullcone + " && "
               + IPTABLES_CMD + " -t nat " + "-" + cmd + " PREROUTING " + prototype + " -j DNAT -d " + m_staticNaptEntry[key].local_ip + " --dport "
               + m_staticNaptEntry[key].local_port + " --to-destination " + keys[0] + ":" + keys[2] + " && "
@@ -905,7 +1001,7 @@ bool NatMgr::setDynamicNatIptablesRulesWithoutAcl(const string &opCmd, const str
         {   
             /* Rules for Double NAT */ 
             cmds = std::string("")
-              + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT -o " + interface + " --to-source "
+              + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT " + intfStr + " --to-source "
               + externalString + " -d " + key + fullcone + " && "
               + IPTABLES_CMD + " -t nat " + "-" + cmd + " PREROUTING" + " -j DNAT -d " + m_staticNatEntry[key].local_ip + " --to-destination " + key + " && "
               + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING" + " -j SNAT -s " + key + " --to-source " + m_staticNatEntry[key].local_ip ;
@@ -947,6 +1043,17 @@ bool NatMgr::setDynamicNatIptablesRulesWithAcl(const string &opCmd, const string
     std::string prototype = EMPTY_STRING;
     std::string cmds = std::string("");
     vector<string> keys;
+    std::string intfStr = std::string("");
+
+    /* Check the interface is Loopback */
+    if (strncmp(interface.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+    {
+        intfStr = " -o " + interface;
+    }
+    else
+    {
+        intfStr = " -m mark --mark " + m_natZoneInterfaceInfo[interface];
+    }
 
     if (external_port_range.empty())
     {
@@ -1099,17 +1206,17 @@ bool NatMgr::setDynamicNatIptablesRulesWithAcl(const string &opCmd, const string
             {
                 cmds = std::string("")
                    + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p tcp" + srcIpAddressString + dstIpAddressString + srcPortString + dstPortString 
-                   + " -j SNAT -o " + interface + " --to-source " + externalString + fullcone + " && "
+                   + " -j SNAT " + intfStr + " --to-source " + externalString + fullcone + " && "
                    + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p udp" + srcIpAddressString + dstIpAddressString + srcPortString + dstPortString
-                   + " -j SNAT -o " + interface + " --to-source " + externalString + fullcone + " && "
+                   + " -j SNAT " + intfStr + " --to-source " + externalString + fullcone + " && "
                    + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p icmp" + srcIpAddressString + dstIpAddressString + srcPortString + dstPortString 
-                   + " -j SNAT -o " + interface + " --to-source " + externalString + fullcone;
+                   + " -j SNAT " + intfStr + " --to-source " + externalString + fullcone;
             }
             else
             {
                 cmds = std::string("")
                   + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING -p " + natAclRuleId.ip_protocol + srcIpAddressString
-                  + dstIpAddressString + srcPortString + dstPortString + " -j SNAT -o " + interface + " --to-source " + externalString + fullcone;
+                  + dstIpAddressString + srcPortString + dstPortString + " -j SNAT " + intfStr + " --to-source " + externalString + fullcone;
             }
         }
         else
@@ -1118,7 +1225,7 @@ bool NatMgr::setDynamicNatIptablesRulesWithAcl(const string &opCmd, const string
             {
                 /* Rules for Double NAT */
                 cmds = std::string("")
-                  + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT -o " + interface + srcIpAddressString + srcPortString 
+                  + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT " + intfStr + srcIpAddressString + srcPortString 
                   + " --to-source " + externalString + " -d " + keys[0] + " --dport " + keys[2] + fullcone + " && "
                   + IPTABLES_CMD + " -t nat " + "-" + cmd + " PREROUTING " + prototype + " -j DNAT -d " + m_staticNaptEntry[key].local_ip + " --dport "
                   + m_staticNaptEntry[key].local_port + srcIpAddressString + srcPortString + " --to-destination " + keys[0] + ":" + keys[2] + " && "
@@ -1129,7 +1236,7 @@ bool NatMgr::setDynamicNatIptablesRulesWithAcl(const string &opCmd, const string
             {
                 /* Rules for Double NAT */
                 cmds = std::string("")
-                  + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT -o " + interface + srcIpAddressString 
+                  + IPTABLES_CMD + " -t nat " + "-" + opCmd + " POSTROUTING " + prototype + " -j SNAT " + intfStr + srcIpAddressString 
                   + " --to-source " + externalString + " -d " + key + fullcone + " && "
                   + IPTABLES_CMD + " -t nat " + "-" + cmd + " PREROUTING" + " -j DNAT -d " + m_staticNatEntry[key].local_ip + srcIpAddressString
                   + " --to-destination " + key + " && "
@@ -2456,7 +2563,7 @@ void NatMgr::removeStaticTwiceNatEntry(const string &key)
         }
 
         /* Check the key is matching, otherwise continue */
-        if (m_staticNatEntry[key].binding_key == (*it).first)
+        if (m_staticNatEntry[key].binding_key != (*it).first)
         {
             continue;
         }
@@ -2471,7 +2578,7 @@ void NatMgr::removeStaticTwiceNatEntry(const string &key)
         }
 
         /* Delete Dynamic rules */
-        setDynamicAllForwardOrAclbasedRules(DELETE, m_natBindingInfo[key].pool_interface, m_natPoolInfo[pool_name].ip_range,
+        setDynamicAllForwardOrAclbasedRules(DELETE, (*it).second.pool_interface, m_natPoolInfo[pool_name].ip_range,
                                             m_natPoolInfo[pool_name].port_range, acls_name, (*it).first);
 
         (*it).second.twice_nat_added = false;
@@ -2772,7 +2879,7 @@ void NatMgr::removeStaticTwiceNaptEntry(const string &key)
         }
 
         /* Check the key is matching, otherwise continue */
-        if (m_staticNaptEntry[key].binding_key == (*it).first)
+        if (m_staticNaptEntry[key].binding_key != (*it).first)
         {
             continue;
         }
@@ -2787,7 +2894,7 @@ void NatMgr::removeStaticTwiceNaptEntry(const string &key)
         }
 
         /* Delete Dynamic rules */
-        setDynamicAllForwardOrAclbasedRules(DELETE, m_natBindingInfo[key].pool_interface, m_natPoolInfo[pool_name].ip_range,
+        setDynamicAllForwardOrAclbasedRules(DELETE, (*it).second.pool_interface, m_natPoolInfo[pool_name].ip_range,
                                             m_natPoolInfo[pool_name].port_range, acls_name, (*it).first);
 
         (*it).second.twice_nat_added = false;
@@ -3794,7 +3901,7 @@ void NatMgr::deleteDynamicTwiceNatRule(const string &key)
                 continue;
             }
 
-            /* Check the key is matchig, otherwise continue */
+            /* Check the key is matching, otherwise continue */
             if (m_natBindingInfo[key].static_key != (*it).first)
             {
                 continue;
@@ -3841,7 +3948,7 @@ void NatMgr::deleteDynamicTwiceNatRule(const string &key)
                 continue;
             }
 
-            /* Check the key is matchig, otherwise continue */
+            /* Check the key is matching, otherwise continue */
             if (m_natBindingInfo[key].static_key != (*it).first)
             {
                 continue;
@@ -3910,7 +4017,7 @@ void NatMgr::enableNatFeature(void)
     addDynamicNatRules();
 
     /* Add full-cone PRE-ROUTING DNAT rule in the kernel */
-    setFullConeDnatRule(ADD);
+    setFullConeDnatIptablesRule(ADD);
 }
 
 /* To disable the NAT Feature */
@@ -3938,7 +4045,7 @@ void NatMgr::disableNatFeature(void)
     SWSS_LOG_INFO("Disabled NAT Admin Mode to APPL_DB");
 
     /* Delete full-cone PRE-ROUTING DNAT rule in the kernel */
-    setFullConeDnatRule(DELETE);
+    setFullConeDnatIptablesRule(DELETE);
 }
 
 /* To parse the received Static NAT Table and save it to cache */
@@ -5487,37 +5594,40 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
     while (it != consumer.m_toSync.end())
     {
         KeyOpFieldsValuesTuple t = it->second;
-        string key = kfvKey(t);
+        string key = kfvKey(t), nat_zone = "1";
         vector<string> keys = tokenize(kfvKey(t), config_db_key_delimiter);
         string op = kfvOp(t), port(keys[0]);
         uint32_t ipv4_addr;
         struct in6_addr ipv6_addr;
         bool foundPosition = false, skipAddition = false, skipDeletion = false;
-        int prefixLen = 0;
+        int prefixLen = 0, nat_zone_value = 1;
+        vector<string> ipPrefixKeys;
 
         /* Example : Config_DB
-         * INTERFACE|Ethernet28|10.0.0.1/24
-         * 
+         * INTERFACE|Ethernet28|10.0.0.1/24 
+         * or
+         * INTERFACE|Ethernet28
+         * {
+         *    nat_zone = "0"
+         * }
          */
 
-        /* Ensure the key size is 2 otherwise ignore */
-        if (keys.size() != L3_INTERFACE_KEY_SIZE)
+        /* Ensure the key size is 2 or 1, otherwise ignore */
+        if ((keys.size() != L3_INTERFACE_KEY_SIZE) and (keys.size() != L3_INTERFACE_ZONE_SIZE))
         {
-            if (keys.size() == 1)
-            {
-                SWSS_LOG_INFO("Not interested with key size %lu, skipping %s", keys.size(), key.c_str());
-            }
-            else
-            {
-                SWSS_LOG_INFO("Invalid key size %lu, skipping %s", keys.size(), key.c_str());
-            }
+            SWSS_LOG_INFO("Invalid key size %lu, skipping %s", keys.size(), key.c_str());
             it = consumer.m_toSync.erase(it);
             continue;
         }
+        else
+        {
+            SWSS_LOG_INFO("Key size %lu for %s", keys.size(), key.c_str());
+        }
 
-        /* Ensure the key starts with "Vlan" or "Ethernet" or "PortChannel" otherwise ignore */
+        /* Ensure the key starts with "Vlan" or "Ethernet" or "PortChannel" or "Loopback", otherwise ignore */
         if ((strncmp(keys[0].c_str(), VLAN_PREFIX, strlen(VLAN_PREFIX))) and
             (strncmp(keys[0].c_str(), ETHERNET_PREFIX, strlen(ETHERNET_PREFIX))) and
+            (strncmp(keys[0].c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX))) and
             (strncmp(keys[0].c_str(), LAG_PREFIX, strlen(LAG_PREFIX))))
         {
             SWSS_LOG_INFO("Invalid key %s format, skipping %s", keys[0].c_str(), key.c_str());
@@ -5525,51 +5635,54 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
             continue;
         }
 
-        vector<string> ipPrefixKeys = tokenize(keys[1], ip_address_delimiter);
+        if (keys.size() == L3_INTERFACE_KEY_SIZE)
+        {
+            ipPrefixKeys = tokenize(keys[1], ip_address_delimiter);
         
-        /* Ensure the ipPrefix key size is 2 otherwise ignore */
-        if (ipPrefixKeys.size() != IP_PREFIX_SIZE)
-        {
-            SWSS_LOG_INFO("Invalid IpPrefix size %s, skipping %s", keys[1].c_str(), key.c_str());
-            it = consumer.m_toSync.erase(it);
-            continue;
-        }
+            /* Ensure the ipPrefix key size is 2 otherwise ignore */
+            if (ipPrefixKeys.size() != IP_PREFIX_SIZE)
+            {
+                SWSS_LOG_INFO("Invalid IpPrefix size %s, skipping %s", keys[1].c_str(), key.c_str());
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
 
-        /* Ensure the ip address is ipv4, otherwise ignore */
-        if (inet_pton(AF_INET6, ipPrefixKeys[0].c_str(), &ipv6_addr))
-        {
-            /* Ignore the IPv6 addresses */
-            SWSS_LOG_INFO("IPv6 address is not supported, skipping %s", key.c_str());
-            it = consumer.m_toSync.erase(it);
-            continue;
-        }
+            /* Ensure the ip address is ipv4, otherwise ignore */
+            if (inet_pton(AF_INET6, ipPrefixKeys[0].c_str(), &ipv6_addr))
+            {
+                /* Ignore the IPv6 addresses */
+                SWSS_LOG_INFO("IPv6 address is not supported, skipping %s", key.c_str());
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
  
-        /* Ensure the ip format is x.x.x.x, otherwise ignore */
-        if (inet_pton(AF_INET, ipPrefixKeys[0].c_str(), &ipv4_addr) != 1)
-        {
-            SWSS_LOG_INFO("Invalid ip address %s format, skipping %s", ipPrefixKeys[0].c_str(), key.c_str());
-            it = consumer.m_toSync.erase(it);
-            continue;
-        }
+            /* Ensure the ip format is x.x.x.x, otherwise ignore */
+            if (inet_pton(AF_INET, ipPrefixKeys[0].c_str(), &ipv4_addr) != 1)
+            {
+                SWSS_LOG_INFO("Invalid ip address %s format, skipping %s", ipPrefixKeys[0].c_str(), key.c_str());
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
 
-        /* Ensure the given PrefixLen is integer, otherwise ignore */
-        try
-        {
-            prefixLen = stoi(ipPrefixKeys[1]);
-        }
-        catch(...)
-        {
-            SWSS_LOG_ERROR("Invalid ip mask len %s, skipping %s", ipPrefixKeys[1].c_str(), key.c_str());
-            it = consumer.m_toSync.erase(it);
-            continue;
-        }
+            /* Ensure the given PrefixLen is integer, otherwise ignore */
+            try
+            {
+                prefixLen = stoi(ipPrefixKeys[1]);
+            }
+            catch(...)
+            {
+                SWSS_LOG_ERROR("Invalid ip mask len %s, skipping %s", ipPrefixKeys[1].c_str(), key.c_str());
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
 
-        /* Ensure the ip mask len is valid, otherwise ignore */
-        if ((prefixLen < IP_ADDR_MASK_LEN_MIN) or (prefixLen > IP_ADDR_MASK_LEN_MAX))
-        {
-            SWSS_LOG_INFO("Invalid ip mask len %s, skipping %s", ipPrefixKeys[1].c_str(), key.c_str());
-            it = consumer.m_toSync.erase(it);
-            continue;
+            /* Ensure the ip mask len is valid, otherwise ignore */
+            if ((prefixLen < IP_ADDR_MASK_LEN_MIN) or (prefixLen > IP_ADDR_MASK_LEN_MAX))
+            {
+                SWSS_LOG_INFO("Invalid ip mask len %s, skipping %s", ipPrefixKeys[1].c_str(), key.c_str());
+                it = consumer.m_toSync.erase(it);
+                continue;
+            }
         }
 
         if (op == SET_COMMAND)
@@ -5580,53 +5693,128 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
              * Don't proceed if Port/LAG/VLAN is not ready yet.
              * The pending task will be checked periodically and retried.
              */
-            if (!isPortStateOk(port))
+            if ((strncmp(keys[0].c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX))) and 
+                (!isPortStateOk(port)))
             {
                 SWSS_LOG_INFO("Port is not ready, skipping %s", port.c_str());
                 it++;
                 continue;
             }
 
-            /*
-             * Don't proceed if Interface is not ready yet.
-             * The pending task will be checked periodically and retried.
-             */
-            if (!isIntfStateOk(key))
+            if (keys.size() == L3_INTERFACE_ZONE_SIZE)
             {
-                SWSS_LOG_INFO("Interface is not ready, skipping %s", key.c_str());
-                it++;
-                continue;
-            }
+                const vector<FieldValueTuple>& data = kfvFieldsValues(t);
 
-            /* Check the key is present in ip_interface cache */
-            if (m_natIpInterfaceInfo.find(port) != m_natIpInterfaceInfo.end())
-            {
-                for (auto it = m_natIpInterfaceInfo[port].begin(); it != m_natIpInterfaceInfo[port].end(); it++)
+                /* Get the Config_db key values */
+                for (auto idx : data)
                 {
-                    if ((*it) == keys[1])
+                    if (fvField(idx) == NAT_ZONE)
                     {
-                        SWSS_LOG_INFO("Duplicate Ip Interface, skipping %s", key.c_str());
-                        skipAddition = true;
+                        /* Ensure the given nat_zone is integer, otherwise ignore */
+                        try
+                        {
+                            nat_zone_value = stoi(fvValue(idx));
+                        }
+                        catch(...)
+                        {
+                            SWSS_LOG_ERROR("Invalid nat_zone %s, skipping %s", fvValue(idx).c_str(), key.c_str());
+                            continue;
+                        }
+
+                        /* Add plus 1 to avoid adding default zero mark in iptables mangle table */
+                        nat_zone_value++;
+                        nat_zone = to_string(nat_zone_value);
                         break;
-                    } 
+                    }      
+                }
+
+                /* Check the key is present in zone_interface cache */
+                if (m_natZoneInterfaceInfo.find(port) != m_natZoneInterfaceInfo.end())
+                {
+                    /* Check the nat_zone is same or not */
+                    if (m_natZoneInterfaceInfo[port] != nat_zone)
+                    {
+                        /* Set the mangle iptables rules for non-loopback interface */
+                        if (strncmp(keys[0].c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+                        {
+                            setMangleIptablesRules(DELETE, port, m_natZoneInterfaceInfo[port]);
+                        }
+                    }
                     else
                     {
-                        IpPrefix entry(keys[1]), prefix(*it);
-
-                        if (prefix.isAddressInSubnet(entry.getIp()))
-                        { 
-                            SWSS_LOG_INFO("IP Address %s belongs to existing subnet, skipped adding entries", ipPrefixKeys[0].c_str());
-                            m_natIpInterfaceInfo[port].push_back(keys[1]);
-                            skipAddition = true;
-                            break;
-                        }
+                        SWSS_LOG_INFO("Received same nat_zone %s, skipping %s", nat_zone.c_str(), key.c_str());
+                        it = consumer.m_toSync.erase(it);
+                        continue;
                     }
                 }
 
-                if (skipAddition == false)
+                m_natZoneInterfaceInfo[port] = nat_zone;
+
+                /* Set the mangle iptables rules for non-loopback interface */
+                if (strncmp(keys[0].c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+                {
+                    setMangleIptablesRules(ADD, port, nat_zone);
+                }
+            }
+            else if (keys.size() == L3_INTERFACE_KEY_SIZE)
+            {
+                /*
+                 * Don't proceed if Interface is not ready yet.
+                 * The pending task will be checked periodically and retried.
+                 */
+                if (!isIntfStateOk(key))
+                {
+                    SWSS_LOG_INFO("Interface is not ready, skipping %s", key.c_str());
+                    it++;
+                    continue;
+                }
+
+                /* Check the key is present in ip_interface cache */
+                if (m_natIpInterfaceInfo.find(port) != m_natIpInterfaceInfo.end())
+                {
+                    for (auto it = m_natIpInterfaceInfo[port].begin(); it != m_natIpInterfaceInfo[port].end(); it++)
+                    {
+                        if ((*it) == keys[1])
+                        {
+                            SWSS_LOG_INFO("Duplicate Ip Interface, skipping %s", key.c_str());
+                            skipAddition = true;
+                             break;
+                        } 
+                        else
+                        {
+                            IpPrefix entry(keys[1]), prefix(*it);
+
+                            if (prefix.isAddressInSubnet(entry.getIp()))
+                            { 
+                                SWSS_LOG_INFO("IP Address %s belongs to existing subnet, skipped adding entries", ipPrefixKeys[0].c_str());
+                                m_natIpInterfaceInfo[port].push_back(keys[1]);
+                                skipAddition = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (skipAddition == false)
+                    {
+                        m_natIpInterfaceInfo[port].push_back(keys[1]);
+                        SWSS_LOG_INFO("Ip Interface %s is added to existing Port cache", key.c_str());
+
+                        /* Add the Static NAT and NAPT entries */
+                        SWSS_LOG_INFO("Adding Static NAT entries for %s", key.c_str());
+                        addStaticNatEntries(keys[0], keys[1]);
+
+                        SWSS_LOG_INFO("Adding Static NAPT entries for %s", key.c_str());
+                        addStaticNaptEntries(keys[0], keys[1]);
+
+                        /* Add the Dynamic NAT rules */
+                        SWSS_LOG_INFO("Adding Dynamic NAT rules for %s", key.c_str());
+                        addDynamicNatRules(keys[0], keys[1]);
+                    }
+                }
+                else
                 {
                     m_natIpInterfaceInfo[port].push_back(keys[1]);
-                    SWSS_LOG_INFO("Ip Interface %s is added to existing Port cache", key.c_str());
+                    SWSS_LOG_INFO("Added Ip Interface %s to cache", key.c_str());
 
                     /* Add the Static NAT and NAPT entries */
                     SWSS_LOG_INFO("Adding Static NAT entries for %s", key.c_str());
@@ -5638,92 +5826,104 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
                     /* Add the Dynamic NAT rules */
                     SWSS_LOG_INFO("Adding Dynamic NAT rules for %s", key.c_str());
                     addDynamicNatRules(keys[0], keys[1]);
-                }
+                 }
             }
             else
             {
-                m_natIpInterfaceInfo[port].push_back(keys[1]);
-                SWSS_LOG_INFO("Added Ip Interface %s to cache", key.c_str());
-
-                /* Add the Static NAT and NAPT entries */
-                SWSS_LOG_INFO("Adding Static NAT entries for %s", key.c_str());
-                addStaticNatEntries(keys[0], keys[1]);
-
-                SWSS_LOG_INFO("Adding Static NAPT entries for %s", key.c_str());
-                addStaticNaptEntries(keys[0], keys[1]);
-
-                /* Add the Dynamic NAT rules */
-                SWSS_LOG_INFO("Adding Dynamic NAT rules for %s", key.c_str());
-                addDynamicNatRules(keys[0], keys[1]);
+                SWSS_LOG_INFO("Invalid key size %lu, skipping %s", keys.size(), key.c_str());
             }
-
             it = consumer.m_toSync.erase(it);
         }
         else if (op == DEL_COMMAND)
         {
             SWSS_LOG_INFO("Del command for %s", key.c_str());
-
-            /* Check the key is present in ip_interface cache*/
-            if (m_natIpInterfaceInfo.find(port) != m_natIpInterfaceInfo.end())
+            
+            if (keys.size() == L3_INTERFACE_ZONE_SIZE)   
             {
-                if (m_natIpInterfaceInfo[port].size() > 1)
+                /* Check the key is present in zone_interface cache*/
+                if (m_natZoneInterfaceInfo.find(port) != m_natZoneInterfaceInfo.end())
                 {
-                    /* Get the position of the key and erase the key */
-                    int position = 0;
-                    for (auto ipPrefix = m_natIpInterfaceInfo[port].begin(); ipPrefix != m_natIpInterfaceInfo[port].end(); ipPrefix++)
+                    /* Set the mangle iptables rules for non-loopback interface */
+                    if (strncmp(keys[0].c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
                     {
-                        if (*ipPrefix == keys[1])
-                        {
-                            foundPosition = true;  
-                        }
-
-                        if (!foundPosition)
-                        {
-                            ++position;
-                        }
-
-                        IpPrefix entry(keys[1]), prefix(*ipPrefix);
-
-                        if (prefix.isAddressInSubnet(entry.getIp()))
-                        {
-                            SWSS_LOG_INFO("IP Address %s belongs to existing subnet, skipping deleting the entries", ipPrefixKeys[0].c_str());
-                            skipDeletion = true;
-                        }
-
-                        if (foundPosition and skipDeletion)
-                        {
-                            break;
-                        }
+                        setMangleIptablesRules(DELETE, port, m_natZoneInterfaceInfo[port]); 
                     }
 
-                    m_natIpInterfaceInfo[port].erase(m_natIpInterfaceInfo[port].begin() + position);
-                    SWSS_LOG_INFO("Ip Interface %s is cleaned from the existing Port cache", key.c_str());
+                    SWSS_LOG_INFO("Nat Zone %s for Interface %s is cleaned from the cache", m_natZoneInterfaceInfo[port].c_str(), key.c_str());
+                    m_natZoneInterfaceInfo.erase(port);
                 }
                 else
                 {
-                    m_natIpInterfaceInfo.erase(port);
-                    SWSS_LOG_INFO("Ip Interface %s is cleaned from the cache", key.c_str());
+                    SWSS_LOG_INFO("Zone Interface is not present in cache, skipping %s", key.c_str());
                 }
-
-                if (!skipDeletion)
+            }
+            else if (keys.size() == L3_INTERFACE_KEY_SIZE)
+            {
+                /* Check the key is present in ip_interface cache*/
+                if (m_natIpInterfaceInfo.find(port) != m_natIpInterfaceInfo.end())
                 {
-                    /* Delete the Static NAT and NAPT entries */
-                    SWSS_LOG_INFO("Deleting Static NAT entries for %s", key.c_str());
-                    removeStaticNatEntries(keys[0], keys[1]);
+                    if (m_natIpInterfaceInfo[port].size() > 1)
+                    {
+                        /* Get the position of the key and erase the key */
+                        int position = 0;
+                        for (auto ipPrefix = m_natIpInterfaceInfo[port].begin(); ipPrefix != m_natIpInterfaceInfo[port].end(); ipPrefix++)
+                        {
+                            if (*ipPrefix == keys[1])
+                            {
+                                foundPosition = true;  
+                            }
 
-                    SWSS_LOG_INFO("Deleting Static NAPT entries for %s", key.c_str());
-                    removeStaticNaptEntries(keys[0], keys[1]);
+                            if (!foundPosition)
+                            {
+                                ++position;
+                            }
 
-                    /* Delete the Dynamic NAT rules */
-                    SWSS_LOG_INFO("Deleting Dynamic NAT rules for %s", key.c_str());
-                    removeDynamicNatRules(keys[0], keys[1]);
+                            IpPrefix entry(keys[1]), prefix(*ipPrefix);
+
+                            if (prefix.isAddressInSubnet(entry.getIp()))
+                            {
+                                SWSS_LOG_INFO("IP Address %s belongs to existing subnet, skipping deleting the entries", ipPrefixKeys[0].c_str());
+                                skipDeletion = true;
+                            }
+   
+                            if (foundPosition and skipDeletion)
+                            {
+                                break;
+                            }
+                        }
+
+                        m_natIpInterfaceInfo[port].erase(m_natIpInterfaceInfo[port].begin() + position);
+                        SWSS_LOG_INFO("Ip Interface %s is cleaned from the existing Port cache", key.c_str());
+                    }
+                    else
+                    {
+                        m_natIpInterfaceInfo.erase(port);
+                        SWSS_LOG_INFO("Ip Interface %s is cleaned from the cache", key.c_str());
+                    }
+
+                    if (!skipDeletion)
+                    {
+                        /* Delete the Static NAT and NAPT entries */
+                        SWSS_LOG_INFO("Deleting Static NAT entries for %s", key.c_str());
+                        removeStaticNatEntries(keys[0], keys[1]);
+
+                        SWSS_LOG_INFO("Deleting Static NAPT entries for %s", key.c_str());
+                        removeStaticNaptEntries(keys[0], keys[1]);
+
+                        /* Delete the Dynamic NAT rules */
+                        SWSS_LOG_INFO("Deleting Dynamic NAT rules for %s", key.c_str());
+                        removeDynamicNatRules(keys[0], keys[1]);
+                    }
+                }
+                else
+                {
+                    SWSS_LOG_INFO("Invalid Ip Interface %s from Config_Db, do nothing", key.c_str());
                 }
             }
             else
             {
-                SWSS_LOG_INFO("Invalid Ip Interface %s from Config_Db, do nothing", key.c_str());
+                SWSS_LOG_INFO("Invalid key size %lu, skipping %s", keys.size(), key.c_str());
             }
-
             it = consumer.m_toSync.erase(it);
         }
         else
@@ -6167,7 +6367,7 @@ void NatMgr::doTask(Consumer &consumer)
         doNatGlobalTask(consumer);
     }
     else if ((table_name == CFG_INTF_TABLE_NAME) || (table_name == CFG_LAG_INTF_TABLE_NAME) ||
-             (table_name == CFG_VLAN_INTF_TABLE_NAME))
+             (table_name == CFG_VLAN_INTF_TABLE_NAME) || (table_name == CFG_LOOPBACK_INTERFACE_TABLE_NAME))
     {
         SWSS_LOG_INFO("Received update from CFG_INTF_TABLE_NAME");
         doNatIpInterfaceTask(consumer);

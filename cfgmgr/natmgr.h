@@ -55,6 +55,7 @@ namespace swss {
 #define NAT_ACLS                   "access_list"
 #define VALUES                     "Values"
 #define NAT_ADMIN_MODE             "admin_mode"
+#define NAT_ZONE                   "nat_zone"
 #define NAT_TIMEOUT                "nat_timeout"
 #define NAT_TIMEOUT_MIN            300
 #define NAT_TIMEOUT_MAX            432000
@@ -68,9 +69,11 @@ namespace swss {
 #define NAT_UDP_TIMEOUT_MAX        600
 #define NAT_UDP_TIMEOUT_DEFAULT    300
 #define L3_INTERFACE_KEY_SIZE      2
+#define L3_INTERFACE_ZONE_SIZE     1
 #define VLAN_PREFIX                "Vlan"
 #define LAG_PREFIX                 "PortChannel"
 #define ETHERNET_PREFIX            "Ethernet"
+#define LOOPBACK_PREFIX            "Loopback"
 #define ACL_TABLE_KEY_SIZE         1
 #define TABLE_TYPE                 "TYPE"
 #define TABLE_STAGE                "STAGE"
@@ -213,6 +216,12 @@ typedef std::map<std::string, std::string> natAclTable_map_t;
  */
 typedef std::map<std::string, natAclRule_t> natAclRule_map_t;
 
+/* To store NAT Zone Interface configuration,
+ * Key is "Port" (Eg. Ethernet1)
+ * Value is "nat_zone" (Eg. "1")
+ */
+typedef std::map<std::string, std::string> natZoneInterface_map_t;
+
 /* Define NatMgr Class inherited from Orch Class */
 class NatMgr : public Orch
 {
@@ -230,7 +239,7 @@ private:
     ProducerStateTable m_appTwiceNatTableProducer, m_appTwiceNaptTableProducer;
     Table m_cfgStaticNatTable, m_cfgStaticNaptTable, m_cfgNatPoolTable, m_cfgNatBindingsTable, m_cfgNatGlobalTable;
     Table m_cfgNatAclTable, m_cfgNatAclRuleTable, m_appNaptPoolIpTable;
-    Table m_cfgInterfaceTable, m_cfgLagInterfaceTable, m_cfgVlanInterfaceTable;
+    Table m_cfgInterfaceTable, m_cfgLagInterfaceTable, m_cfgVlanInterfaceTable, m_cfgLoopbackInterfaceTable;
     Table m_statePortTable, m_stateLagTable, m_stateVlanTable, m_stateInterfaceTable;
     std::shared_ptr<swss::NotificationProducer> flushNotifier;
 
@@ -240,13 +249,14 @@ private:
     int     m_natUdpTimeout;
     string  natAdminMode;
 
-    natPool_map_t          m_natPoolInfo;
-    natBinding_map_t       m_natBindingInfo;
-    staticNatEntry_map_t   m_staticNatEntry;
-    staticNaptEntry_map_t  m_staticNaptEntry;
-    natIpInterface_map_t   m_natIpInterfaceInfo;
-    natAclTable_map_t      m_natAclTableInfo;
-    natAclRule_map_t       m_natAclRuleInfo;
+    natPool_map_t            m_natPoolInfo;
+    natBinding_map_t         m_natBindingInfo;
+    staticNatEntry_map_t     m_staticNatEntry;
+    staticNaptEntry_map_t    m_staticNaptEntry;
+    natIpInterface_map_t     m_natIpInterfaceInfo;
+    natZoneInterface_map_t   m_natZoneInterfaceInfo;
+    natAclTable_map_t        m_natAclTableInfo;
+    natAclRule_map_t         m_natAclRuleInfo;
 
     /* Declare doTask related fucntions */
     void doTask(Consumer &consumer);
@@ -306,8 +316,9 @@ private:
     bool isMatchesWithStaticNapt(const string &global_ip, string &local_ip);
     bool isGlobalIpMatching(const string &intf_keys, const string &global_ip);
     bool getIpEnabledIntf(const string &global_ip, string &interface);
-    bool setFullConeDnatRule(const string &opCmd);
     void setNaptPoolIpTable(const string &opCmd, const string &nat_ip, const string &nat_port);
+    bool setFullConeDnatIptablesRule(const string &opCmd);
+    bool setMangleIptablesRules(const string &opCmd, const string &interface, const string &nat_zone);
     bool setStaticNatIptablesRules(const string &opCmd, const string &interface, const string &external_ip, const string &internal_ip, const string &nat_type);
     bool setStaticNaptIptablesRules(const string &opCmd, const string &interface, const string &prototype, const string &external_ip, 
                                     const string &external_port, const string &internal_ip, const string &internal_port, const string &nat_type);

@@ -38,10 +38,10 @@ using namespace swss;
 #define CT_UDP_EXPIRY_TIMEOUT   600 /* Max conntrack timeout in the user configurable range */
 
 NatSync::NatSync(RedisPipeline *pipelineAppDB, DBConnector *appDb, DBConnector *stateDb, NfNetlink *nfnl) :
-    m_natTable(pipelineAppDB, APP_NAT_TABLE_NAME),
-    m_naptTable(pipelineAppDB, APP_NAPT_TABLE_NAME),
-    m_natTwiceTable(pipelineAppDB, APP_NAT_TWICE_TABLE_NAME),
-    m_naptTwiceTable(pipelineAppDB, APP_NAPT_TWICE_TABLE_NAME),
+    m_natTable(appDb, APP_NAT_TABLE_NAME),
+    m_naptTable(appDb, APP_NAPT_TABLE_NAME),
+    m_natTwiceTable(appDb, APP_NAT_TWICE_TABLE_NAME),
+    m_naptTwiceTable(appDb, APP_NAPT_TWICE_TABLE_NAME),
     m_natCheckTable(appDb, APP_NAT_TABLE_NAME),
     m_naptCheckTable(appDb, APP_NAPT_TABLE_NAME),
     m_twiceNatCheckTable(appDb, APP_NAT_TWICE_TABLE_NAME),
