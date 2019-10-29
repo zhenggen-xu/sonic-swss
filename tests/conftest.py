@@ -320,6 +320,12 @@ class DockerVirtualSwitch(object):
             cmd += "supervisorctl start {}; ".format(pname)
         self.runcmd(['sh', '-c', cmd])
 
+    def stop_all_daemons(self):
+        cmd = ""
+        for pname in self.alld:
+            cmd += "supervisorctl stop {}; ".format(pname)
+        self.runcmd(['sh', '-c', cmd])
+
     # stop processes in SWSS
     def stop_swss(self):
         cmd = ""

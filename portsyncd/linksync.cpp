@@ -151,6 +151,7 @@ LinkSync::LinkSync(DBConnector *appl_db, DBConnector *state_db) :
 
 void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
 {
+    SWSS_LOG_ENTER();
     if ((nlmsg_type != RTM_NEWLINK) && (nlmsg_type != RTM_DELLINK))
     {
         return;
@@ -222,11 +223,11 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     /* Insert or update the ifindex to key map */
     m_ifindexNameMap[ifindex] = key;
 
-    /* TODO: When port is removed from the kernel */
     if (nlmsg_type == RTM_DELLINK)
     {
         m_statePortTable.del(key);
         SWSS_LOG_NOTICE("Delete %s(ok) from state db", key.c_str());
+        return;
     }
 
     /* front panel interfaces: Check if the port is in the PORT_TABLE
@@ -235,12 +236,6 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     vector<FieldValueTuple> temp;
     if (m_portTable.get(key, temp))
     {
-        /* TODO: When port is removed from the kernel */
-        if (nlmsg_type == RTM_DELLINK)
-        {
-            return;
-        }
-
         /* Host interface is created */
         if (!g_init && g_portSet.find(key) != g_portSet.end())
         {
