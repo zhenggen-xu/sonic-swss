@@ -817,3 +817,36 @@ def testlog(request, dvs):
     dvs.runcmd("logger === start test %s ===" % request.node.name)
     yield testlog
     dvs.runcmd("logger === finish test %s ===" % request.node.name)
+
+##################### DPB fixtures ###########################################
+@pytest.yield_fixture(scope="module")
+def create_dpb_config_file(dvs):
+    cmd = "sonic-cfggen -j /etc/sonic/init_cfg.json -j /tmp/ports.json --print-data > /tmp/dpb_config_db.json"
+    dvs.runcmd(['sh', '-c', cmd])
+    cmd = "mv /etc/sonic/config_db.json /etc/sonic/config_db.json.bak"
+    dvs.runcmd(cmd)
+    cmd = "cp /tmp/dpb_config_db.json /etc/sonic/config_db.json"
+    dvs.runcmd(cmd)
+
+@pytest.yield_fixture(scope="module")
+def remove_dpb_config_file(dvs):
+    cmd = "mv /etc/sonic/config_db.json.bak /etc/sonic/config_db.json"
+    dvs.runcmd(cmd)
+
+@pytest.yield_fixture(scope="module", autouse=True)
+def dpb_setup_fixture(dvs):
+    start_cmd = "/usr/bin/start.sh"
+
+    print "Set Up"
+    create_dpb_config_file(dvs)
+    #dvs.restart()
+    dvs.stop_all_daemons()
+    dvs.runcmd(start_cmd)
+
+    yield
+
+    print "Tear Down"
+    remove_dpb_config_file(dvs)
+    #dvs.restart()
+    dvs.stop_all_daemons()
+    dvs.runcmd(start_cmd)
