@@ -117,14 +117,18 @@ class TestPortDPB(object):
             cp.verify_asic_db()
         print "ASIC DB verification passed"
 
+    '''
     @pytest.mark.skip()
+    '''
     def test_port_1X40G(self, dvs):
         self.breakout(dvs, "Ethernet0", 4)
         print "**** 1X40G --> 4X10G passed ****"
         self.breakin(dvs, ["Ethernet0", "Ethernet1", "Ethernet2", "Ethernet3"])
         print "**** 4X10G --> 1X40G passed ****"
 
+    '''
     @pytest.mark.skip()
+    '''
     def test_port_1X100G(self, dvs):
 
         # Change Ethernet0 speed to 100G
@@ -160,8 +164,6 @@ class TestPortDPB(object):
         for pname in port_names:
             self.breakout(dvs, pname, 4)
 
-        import pdb
-        pdb.set_trace()
         child_port_names = []
         for i in range(128):
             cpname = "Ethernet" + str(i)
@@ -171,5 +173,3 @@ class TestPortDPB(object):
             start = i*4
             end = start+4
             self.breakin(dvs, child_port_names[start:end])
-        import pdb
-        pdb.set_trace()

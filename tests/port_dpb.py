@@ -26,8 +26,6 @@ class Port():
         self._app_db_ptbl = swsscommon.Table(self._app_db, swsscommon.APP_PORT_TABLE_NAME)
         self._asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
         self._asic_db_ptbl = swsscommon.Table(self._asic_db, "ASIC_STATE:SAI_OBJECT_TYPE_PORT")
-        #self._counter_db = swsscommon.DBConnector(swsscommon.COUNTERS_DB, dvs.redis_sock, 0)
-        #self._counter_db = redis.Redis(unix_socket_path=dvs.redis_sock, db=swsscommon.COUNTERS_DB)
 
     def set_name(self, name):
         self._name = name
@@ -71,7 +69,7 @@ class Port():
         return self._name
 
     def get_port_num(self):
-        return int(re.compile(r'(\d+)$').search(self._name).group(1))
+        return self._port_num 
 
     def get_lanes_db_str(self):
         return self._lanes_db_str
@@ -88,7 +86,10 @@ class Port():
     def port_merge(self, child_ports):
         child_ports.sort(key=lambda x: x.get_port_num())
         self.set_name(child_ports[0].get_name())
-        self.set_speed(child_ports[0].get_speed() * len(child_ports))
+        speed = 0
+        for cp in child_ports:
+            speed = speed + cp.get_speed()
+        self.set_speed(speed)
         self.set_alias(child_ports[0].get_alias().rsplit(',',1)[0])
         self.set_index(child_ports[0].get_index())
         lanes =[]
@@ -155,11 +156,11 @@ class Port():
         return fvs_dict
 
     def exists_in_config_db(self):
-        (status, fvs) = self._cfg_db_ptbl.get(self.get_name())
+        (status, _) = self._cfg_db_ptbl.get(self.get_name())
         return status
 
     def exists_in_app_db(self):
-        (status, fvs) = self._app_db_ptbl.get(self.get_name())
+        (status, _) = self._app_db_ptbl.get(self.get_name())
         return status
 
     def exists_in_asic_db(self):
@@ -168,11 +169,10 @@ class Port():
             self._oid = counter_redis_conn.hget("COUNTERS_PORT_NAME_MAP", self.get_name())
             if self._oid is None:
                 return False
-        (status, fvs) = self._asic_db_ptbl.get(self._oid)
+        (status, _) = self._asic_db_ptbl.get(self._oid)
         return status
 
     def verify_config_db(self):
-        assert(self.exists_in_config_db() == True)
         (status, fvs) = self._cfg_db_ptbl.get(self.get_name())
         assert(status == True)
         fvs_dict = self.get_fvs_dict(fvs)
@@ -182,7 +182,6 @@ class Port():
         assert(fvs_dict['index'] == str(self.get_index()))
 
     def verify_app_db(self):
-        assert(self.exists_in_app_db() == True)
         (status, fvs) = self._app_db_ptbl.get(self.get_name())
         assert(status == True)
         fvs_dict = self.get_fvs_dict(fvs)
@@ -192,7 +191,6 @@ class Port():
         assert(fvs_dict['index'] == str(self.get_index()))
 
     def verify_asic_db(self):
-        assert(self.exists_in_asic_db() == True)
         (status, fvs) = self._asic_db_ptbl.get(self.get_oid())
         assert(status == True)
         fvs_dict = self.get_fvs_dict(fvs)
