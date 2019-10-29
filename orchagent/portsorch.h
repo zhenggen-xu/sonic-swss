@@ -165,6 +165,7 @@ private:
     bool removePort(sai_object_id_t port_id);
     bool initPort(const string &alias, const set<int> &lane_set);
     void deinitport(string alias, sai_object_id_t port_id);
+    void flush();
 
     bool setPortAdminStatus(sai_object_id_t id, bool up);
     bool getPortAdminStatus(sai_object_id_t id, bool& up);
