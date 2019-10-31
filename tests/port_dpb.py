@@ -11,7 +11,7 @@ class Port():
     def __init__(self, dvs, name = None):
         self._name = name
         if name != None:
-            self._port_num = int(re.compile(r'(\d+)$').search(self._name).group(1)) 
+            self._port_num = int(re.compile(r'(\d+)$').search(self._name).group(1))
         self._alias = None
         self._speed = None
         self._lanes = []
@@ -44,6 +44,7 @@ class Port():
             lanes_list.append(int(lane))
         lanes_list.sort()
         self._lanes_db_str = str(lanes_list)[1:-1]
+        self._lanes_db_str = self._lanes_db_str.replace(" ","")
         self._lanes_asic_db_str = str(len(lanes)) + ":" + self._lanes_db_str
         self._lanes_asic_db_str = self._lanes_asic_db_str.replace(" ", "")
 
@@ -81,7 +82,7 @@ class Port():
         return self._oid
 
     def print_port(self):
-        print "Port: %s Lanes: %s Speed: %d, Index: %d"%(self._name, self._lanes, self._speed, self._index) 
+        print "Port: %s Lanes: %s Speed: %d, Index: %d"%(self._name, self._lanes, self._speed, self._index)
 
     def port_merge(self, child_ports):
         child_ports.sort(key=lambda x: x.get_port_num())
@@ -109,7 +110,7 @@ class Port():
         lanes_per_child = offset
         for i in range(child_ports):
             child_port_num = port_num + (i * offset)
-            child_port_name = "Ethernet%d"%(child_port_num) 
+            child_port_name = "Ethernet%d"%(child_port_num)
             child_port_alias = "Eth%d/%d"%(port_num, child_port_num)
             child_port_lanes = []
             for j in range(lanes_per_child):
@@ -139,9 +140,9 @@ class Port():
         self.set_index(int(fvs_dict['index']))
 
     def write_to_config_db(self):
-        lanes_str = self.get_lanes_db_str() 
+        lanes_str = self.get_lanes_db_str()
         index_str = str(self.get_index())
-        alias_str = self.get_alias() 
+        alias_str = self.get_alias()
         speed_str = str(self.get_speed())
         fvs = swsscommon.FieldValuePairs([("alias", alias_str),
                                           ("lanes", lanes_str),
@@ -163,12 +164,15 @@ class Port():
         (status, _) = self._app_db_ptbl.get(self.get_name())
         return status
 
-    def exists_in_asic_db(self):
+    def sync_oid(self):
         if self._oid is None:
             counter_redis_conn = redis.Redis(unix_socket_path=self._dvs.redis_sock, db=swsscommon.COUNTERS_DB)
             self._oid = counter_redis_conn.hget("COUNTERS_PORT_NAME_MAP", self.get_name())
-            if self._oid is None:
-                return False
+
+    def exists_in_asic_db(self):
+        self.sync_oid()
+        if self._oid is None:
+            return False
         (status, _) = self._asic_db_ptbl.get(self._oid)
         return status
 
@@ -191,6 +195,7 @@ class Port():
         assert(fvs_dict['index'] == str(self.get_index()))
 
     def verify_asic_db(self):
+        self.sync_oid()
         (status, fvs) = self._asic_db_ptbl.get(self.get_oid())
         assert(status == True)
         fvs_dict = self.get_fvs_dict(fvs)

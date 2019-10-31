@@ -798,6 +798,112 @@ class DockerVirtualSwitch(object):
 
         ntf.send("set_ro", key, fvp)
 
+    def create_acl_table(self, table, type, ports):
+        tbl = swsscommon.Table(self.cdb, "ACL_TABLE")
+        fvs = swsscommon.FieldValuePairs([("policy_desc", table),
+                                          ("type", type),
+                                          ("ports", ",".join(ports))])
+        tbl.set(table, fvs)
+        time.sleep(1)
+
+    def remove_acl_table(self, table):
+        tbl = swsscommon.Table(self.cdb, "ACL_TABLE")
+        tbl._del(table)
+        time.sleep(1)
+
+    def get_acl_table_id(self):
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
+        keys = tbl.getKeys()
+
+        for k in self.asicdb.default_acl_tables:
+            assert k in keys
+
+        acl_tables = [k for k in keys if k not in self.asicdb.default_acl_tables]
+        assert len(acl_tables) == 1
+
+        return acl_tables[0]
+
+    def verify_if_any_acl_table_created(self):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
+        keys = atbl.getKeys()
+        for k in  dvs.asicdb.default_acl_tables:
+            assert k in keys
+        acl_tables = [k for k in keys if k not in dvs.asicdb.default_acl_tables]
+
+        if len(acl_tables) != 0:
+            return True
+
+        return False
+
+    def clean_up_left_over(self):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
+        keys = atbl.getKeys()
+        for key in keys:
+            atbl._del(key)
+
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
+        keys = atbl.getKeys()
+        assert len(keys) == 0
+
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP_MEMBER")
+        keys = atbl.getKeys()
+        for key in keys:
+            atbl._del(key)
+
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP_MEMBER")
+        keys = atbl.getKeys()
+        assert len(keys) == 0
+
+    def verify_acl_group_num(self, expt):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
+        acl_table_groups = atbl.getKeys()
+        assert len(acl_table_groups) == expt
+
+        for k in acl_table_groups:
+            (status, fvs) = atbl.get(k)
+            assert status == True
+            for fv in fvs:
+                if fv[0] == "SAI_ACL_TABLE_GROUP_ATTR_ACL_STAGE":
+                    assert fv[1] == "SAI_ACL_STAGE_EGRESS"
+                elif fv[0] == "SAI_ACL_TABLE_GROUP_ATTR_ACL_BIND_POINT_TYPE_LIST":
+                    assert fv[1] == "1:SAI_ACL_BIND_POINT_TYPE_PORT"
+                elif fv[0] == "SAI_ACL_TABLE_GROUP_ATTR_TYPE":
+                    assert fv[1] == "SAI_ACL_TABLE_GROUP_TYPE_PARALLEL"
+                else:
+                    assert False
+
+    def get_acl_group_ids(self):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
+        acl_table_groups = atbl.getKeys()
+        return acl_table_groups
+
+    def verify_acl_group_member(self, acl_group_ids, acl_table_id):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP_MEMBER")
+        keys = atbl.getKeys()
+
+        member_groups = []
+        for k in keys:
+            (status, fvs) = atbl.get(k)
+            assert status == True
+            assert len(fvs) == 3
+            for fv in fvs:
+                if fv[0] == "SAI_ACL_TABLE_GROUP_MEMBER_ATTR_ACL_TABLE_GROUP_ID":
+                    assert fv[1] in acl_group_ids
+                    member_groups.append(fv[1])
+                elif fv[0] == "SAI_ACL_TABLE_GROUP_MEMBER_ATTR_ACL_TABLE_ID":
+                    assert fv[1] == acl_table_id
+                elif fv[0] == "SAI_ACL_TABLE_GROUP_MEMBER_ATTR_PRIORITY":
+                    assert True
+                else:
+                    assert False
+
+        assert set(member_groups) == set(acl_group_ids)
+
+    def verify_acl_port_binding(self, bind_ports):
+        atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
+        acl_table_groups = atbl.getKeys()
+        assert len(acl_table_groups) == len(bind_ports)
+
 @pytest.yield_fixture(scope="module")
 def dvs(request):
     name = request.config.getoption("--dvsname")
@@ -850,3 +956,6 @@ def dpb_setup_fixture(dvs):
     #dvs.restart()
     dvs.stop_all_daemons()
     dvs.runcmd(start_cmd)
+
+####################### ACL fixtures #################################
+
