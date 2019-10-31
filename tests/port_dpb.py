@@ -69,7 +69,7 @@ class Port():
         return self._name
 
     def get_port_num(self):
-        return self._port_num 
+        return self._port_num
 
     def get_lanes_db_str(self):
         return self._lanes_db_str
