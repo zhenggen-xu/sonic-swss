@@ -325,6 +325,7 @@ class DockerVirtualSwitch(object):
         for pname in self.alld:
             cmd += "supervisorctl stop {}; ".format(pname)
         self.runcmd(['sh', '-c', cmd])
+        time.sleep(5)
 
     # stop processes in SWSS
     def stop_swss(self):
@@ -833,7 +834,7 @@ def remove_dpb_config_file(dvs):
     cmd = "mv /etc/sonic/config_db.json.bak /etc/sonic/config_db.json"
     dvs.runcmd(cmd)
 
-@pytest.yield_fixture(scope="module", autouse=True)
+@pytest.yield_fixture(scope="module")
 def dpb_setup_fixture(dvs):
     start_cmd = "/usr/bin/start.sh"
 
@@ -842,11 +843,12 @@ def dpb_setup_fixture(dvs):
     #dvs.restart()
     dvs.stop_all_daemons()
     dvs.runcmd(start_cmd)
+    time.sleep(10)
 
     yield
 
     print "Tear Down"
     remove_dpb_config_file(dvs)
     #dvs.restart()
-    dvs.stop_all_daemons()
-    dvs.runcmd(start_cmd)
+    #dvs.stop_all_daemons()
+    #dvs.runcmd(start_cmd)

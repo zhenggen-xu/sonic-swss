@@ -20,10 +20,11 @@ class TestPortDPB(object):
 
         for cp in child_ports:
             cp.delete_from_config_db()
-            dvs.runcmd("ip link delete " + cp.get_name())
+            # TBD, need vs lib to support removing hostif 
+            #dvs.runcmd("ip link delete " + cp.get_name())
         print "Deleted child ports:%s from config DB"%port_names
 
-        time.sleep(2)
+        time.sleep(6)
 
         for cp in child_ports:
             assert(cp.exists_in_config_db() == False)
@@ -55,7 +56,8 @@ class TestPortDPB(object):
 
         # Delete port from config DB and kernel
         p.delete_from_config_db()
-        dvs.runcmd("ip link delete " + p.get_name())
+        # TBD, need vs lib to support hostif removal
+        #dvs.runcmd("ip link delete " + p.get_name())
         print "Deleted port:%s from config DB"%port_name
         time.sleep(6)
 

@@ -191,6 +191,7 @@ class Port():
         assert(fvs_dict['index'] == str(self.get_index()))
 
     def verify_asic_db(self):
+        self.exists_in_asic_db()
         (status, fvs) = self._asic_db_ptbl.get(self.get_oid())
         assert(status == True)
         fvs_dict = self.get_fvs_dict(fvs)
