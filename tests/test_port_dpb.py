@@ -34,7 +34,7 @@ class TestPortDPB(object):
             assert(cp.exists_in_asic_db() == False)
         print "Verified child ports are deleted from all DBs"
 
-        p = Port(dvs)  
+        p = Port(dvs)
         p.port_merge(child_ports)
         p.write_to_config_db()
         print "Added port:%s to config DB"%p.get_name()
@@ -67,7 +67,7 @@ class TestPortDPB(object):
         assert(p.exists_in_asic_db() == False)
 
         # Create child ports and write to config DB
-        child_ports = p.port_split(num_child_ports) 
+        child_ports = p.port_split(num_child_ports)
         child_port_names = []
         for cp in child_ports:
             cp.write_to_config_db()
@@ -161,9 +161,7 @@ class TestPortDPB(object):
         self.breakin(dvs, ["Ethernet64", "Ethernet65", "Ethernet66", "Ethernet67"])
         self.breakin(dvs, ["Ethernet112", "Ethernet113", "Ethernet114", "Ethernet115"])
 
-    '''
     @pytest.mark.skip()
-    '''
     def test_port_breakout_all(self, dvs):
         port_names = []
         for i in range(32):
