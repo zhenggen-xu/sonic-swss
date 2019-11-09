@@ -243,8 +243,6 @@ class DockerVirtualSwitch(object):
                 self.ctn.exec_run("sysctl -w net.ipv6.conf.eth%d.disable_ipv6=1" % (i + 1))
             self.check_ready()
             self.init_asicdb_validator()
-            if self.appldb:
-                del self.appldb
             self.appldb = ApplDbValidator(self)
         except:
             self.destroy()
@@ -320,6 +318,8 @@ class DockerVirtualSwitch(object):
         self.ctn.restart()
 
     def restart(self):
+        if self.appldb:
+            del self.appldb
         self.ctn_restart()
         self.check_ctn_status_and_db_connect()
 
