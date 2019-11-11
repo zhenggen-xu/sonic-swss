@@ -21,7 +21,7 @@
 #include "producerstatetable.h"
 #include "orch.h"
 #include "notificationproducer.h"
-
+#include <unistd.h>
 #include <set>
 #include <map>
 #include <string>
@@ -202,7 +202,7 @@ typedef std::map<std::string, staticNaptEntry_t> staticNaptEntry_map_t;
  * Key is "Port" (Eg. Ethernet1)
  * Value is "ip_address_list" (Eg. 10.0.0.1/24,20.0.0.1/24)
  */
-typedef std::map<std::string, vector<std::string>> natIpInterface_map_t;
+typedef std::map<std::string, std::set<std::string>> natIpInterface_map_t;
 
 /* To store NAT ACL Table configuration,
  * Key is "ACL_Table_Id" (Eg. 1)
@@ -232,15 +232,13 @@ public:
 
     /* Function to be called from signal handler on nat docker stop */
     void cleanupPoolIpTable(void);
+    bool isPortInitDone(DBConnector *app_db);
    
 private:
     /* Declare APPL_DB, CFG_DB and STATE_DB tables */
     ProducerStateTable m_appNatTableProducer, m_appNaptTableProducer, m_appNatGlobalTableProducer;
     ProducerStateTable m_appTwiceNatTableProducer, m_appTwiceNaptTableProducer;
-    Table m_cfgStaticNatTable, m_cfgStaticNaptTable, m_cfgNatPoolTable, m_cfgNatBindingsTable, m_cfgNatGlobalTable;
-    Table m_cfgNatAclTable, m_cfgNatAclRuleTable, m_appNaptPoolIpTable;
-    Table m_cfgInterfaceTable, m_cfgLagInterfaceTable, m_cfgVlanInterfaceTable, m_cfgLoopbackInterfaceTable;
-    Table m_statePortTable, m_stateLagTable, m_stateVlanTable, m_stateInterfaceTable;
+    Table m_statePortTable, m_stateLagTable, m_stateVlanTable, m_stateInterfaceTable, m_appNaptPoolIpTable;
     std::shared_ptr<swss::NotificationProducer> flushNotifier;
 
     /* Declare containers to store NAT Info */
@@ -285,18 +283,30 @@ private:
     void addStaticNaptEntry(const string &key);
     void addStaticSingleNatEntry(const string &key);
     void addStaticSingleNaptEntry(const string &key);
+    void addStaticSingleNatIptables(const string &key);
+    void addStaticSingleNaptIptables(const string &key);
     void addStaticTwiceNatEntry(const string &key);
     void addStaticTwiceNaptEntry(const string &key);
+    void addStaticTwiceNatIptables(const string &key);
+    void addStaticTwiceNaptIptables(const string &key);
     void removeStaticNatEntry(const string &key);
     void removeStaticNaptEntry(const string &key);
     void removeStaticSingleNatEntry(const string &key);
     void removeStaticSingleNaptEntry(const string &key);
+    void removeStaticSingleNatIptables(const string &key);
+    void removeStaticSingleNaptIptables(const string &key);
     void removeStaticTwiceNatEntry(const string &key);
     void removeStaticTwiceNaptEntry(const string &key);
+    void removeStaticTwiceNatIptables(const string &key);
+    void removeStaticTwiceNaptIptables(const string &key);
     void addStaticNatEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
     void addStaticNaptEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
     void removeStaticNatEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
     void removeStaticNaptEntries(const string port= NONE_STRING, const string ipPrefix = NONE_STRING);
+    void addStaticNatIptables(const string port);
+    void addStaticNaptIptables(const string port);
+    void removeStaticNatIptables(const string port);
+    void removeStaticNaptIptables(const string port);
     void addDynamicNatRule(const string &key);
     void removeDynamicNatRule(const string &key);
     void addDynamicNatRuleByAcl(const string &key, bool isRuleId = false);

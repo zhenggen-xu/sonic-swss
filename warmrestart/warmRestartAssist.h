@@ -50,14 +50,12 @@ namespace swss {
  *          }
  *      }
  */
-typedef std::map <std::string, Table *>              Tables;
-typedef std::map <std::string, ProducerStateTable *> ProducerStateTables;
-
 class AppRestartAssist
 {
 public:
-    AppRestartAssist(RedisPipeline *pipeline, const std::string &appName,
-                     const std::string &dockerName, const uint32_t defaultWarmStartTimerValue = 0);
+    AppRestartAssist(RedisPipeline *pipeline,
+        const std::string &appName, const std::string &dockerName,
+        ProducerStateTable *psTable, const uint32_t defaultWarmStartTimerValue = 0);
     virtual ~AppRestartAssist();
 
     /*
@@ -78,14 +76,13 @@ public:
     void startReconcileTimer(Select &s);
     void stopReconcileTimer(Select &s);
     bool checkReconcileTimer(Selectable *s);
-    void readTablesToMap(void);
-    void insertToMap(std::string tableName, std::string key, std::vector<FieldValueTuple> fvVector, bool delete_key);
+    void readTableToMap(void);
+    void insertToMap(std::string key, std::vector<FieldValueTuple> fvVector, bool delete_key);
     void reconcile(void);
     bool isWarmStartInProgress(void)
     {
         return m_warmStartInProgress;
     }
-    void registerAppTable(const std::string &tableName, ProducerStateTable *psTable);
 
 private:
     typedef std::map<cache_state_t, std::string> cache_state_map;
@@ -99,16 +96,16 @@ private:
      * Precedence ascent order: Default -> loading class with value -> configuration
      */
     static const uint32_t DEFAULT_INTERNAL_TIMER_VALUE = 5;
-    typedef std::map<std::string, std::unordered_map<std::string, std::vector<swss::FieldValueTuple>>> AppTableMap;
+    typedef std::unordered_map<std::string, std::vector<swss::FieldValueTuple>> AppTableMap;
 
     // cache map to store temperary application table
     AppTableMap appTableCacheMap;
 
-    RedisPipeline      *m_pipeLine;
-    Tables              m_appTables;  // app tables
-    std::string         m_dockerName; // docker name of the application
-    std::string         m_appName;    // application name
-    ProducerStateTables m_psTables;   // producer state tables
+    Table m_appTable;                 // table handler
+    std::string m_dockerName;         // docker name of the application
+    std::string m_appName;            // application name
+    ProducerStateTable *m_psTable;    // produce state table handler
+    std::string m_appTableName;       // application table name
 
     bool m_warmStartInProgress;       // indicate if warm start is in progress
     time_t m_reconcileTimer;          // reconcile timer value

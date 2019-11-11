@@ -24,7 +24,6 @@ public:
     enum { MAX_ADDR_SIZE = 64 };
 
     NeighSync(RedisPipeline *pipelineAppDB, DBConnector *stateDb);
-    ~NeighSync();
 
     virtual void onMsg(int nlmsg_type, struct nl_object *obj);
 
@@ -32,13 +31,13 @@ public:
 
     AppRestartAssist *getRestartAssist()
     {
-        return m_AppRestartAssist;
+        return &m_AppRestartAssist;
     }
 
 private:
     Table m_stateNeighRestoreTable;
     ProducerStateTable m_neighTable;
-    AppRestartAssist  *m_AppRestartAssist;
+    AppRestartAssist m_AppRestartAssist;
 };
 
 }

@@ -40,7 +40,7 @@ int main(int argc, char **argv)
              */
             if (sync.getRestartAssist()->isWarmStartInProgress())
             {
-                sync.getRestartAssist()->readTablesToMap();
+                sync.getRestartAssist()->readTableToMap();
 
                 steady_clock::time_point starttime = steady_clock::now();
                 while (!sync.isNeighRestoreDone())

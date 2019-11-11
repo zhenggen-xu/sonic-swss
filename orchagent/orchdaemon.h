@@ -30,7 +30,6 @@
 #include "sfloworch.h"
 #include "debugcounterorch.h"
 #include "directory.h"
-#include "natorch.h"
 
 using namespace swss;
 

@@ -17,7 +17,6 @@ extern sai_object_id_t gVirtualRouterId;
 extern MacAddress gMacAddress;
 
 #define RIF_STAT_COUNTER_FLEX_COUNTER_GROUP "RIF_STAT_COUNTER"
-#define DEFAULT_NAT_ZONE_ID 0
 
 struct IntfsEntry
 {
@@ -42,9 +41,7 @@ public:
 
     bool setRouterIntfsMtu(const Port &port);
     bool setRouterIntfsAdminStatus(const Port &port);
-    bool setRouterIntfsNatZoneId(Port &port, uint32_t &nat_zone_id);
     std::set<IpPrefix> getSubnetRoutes();
-    std::map<string, uint32_t> m_nat_zone;
 
     void generateInterfaceMap();
     void addRifToFlexCounter(const string&, const string&, const string&);
