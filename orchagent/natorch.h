@@ -28,6 +28,7 @@
 #include "timer.h"
 #include "routeorch.h"
 #include "debugdumporch.h"
+#include "nexthopgroupkey.h"
 
 #define VALUES                            "Values" // Global Values Key
 #define NAT_HITBIT_N_CNTRS_QUERY_PERIOD   5        // 5 secs
