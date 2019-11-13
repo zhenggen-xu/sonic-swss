@@ -17,7 +17,7 @@ endif
 CFLAGS_GTEST =
 LDADD_GTEST = -L/usr/src/gtest
 
-tests_SOURCES = swssnet_ut.cpp request_parser_ut.cpp ../orchagent/request_parser.cpp
+tests_SOURCES = swssnet_ut.cpp request_parser_ut.cpp ../orchagent/request_parser.cpp            \
         quoted_ut.cpp
 
 tests_CFLAGS = $(DBGFLAGS) $(AM_CFLAGS) $(CFLAGS_COMMON) $(CFLAGS_GTEST) $(CFLAGS_SAI)
