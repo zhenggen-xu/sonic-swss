@@ -119,7 +119,7 @@ int main(int argc, char **argv)
             CFG_LAG_INTF_TABLE_NAME,
             CFG_VLAN_INTF_TABLE_NAME,
             CFG_LOOPBACK_INTERFACE_TABLE_NAME,
-            CFG_ACL_TABLE_NAME,
+            CFG_ACL_TABLE_TABLE_NAME,
             CFG_ACL_RULE_TABLE_NAME
         };
 

@@ -7370,9 +7370,9 @@ void NatMgr::doTask(Consumer &consumer)
         SWSS_LOG_INFO("Received update from CFG_INTF_TABLE_NAME");
         doNatIpInterfaceTask(consumer);
     }
-    else if (table_name == CFG_ACL_TABLE_NAME)
+    else if (table_name == CFG_ACL_TABLE_TABLE_NAME)
     {
-        SWSS_LOG_INFO("Received update from CFG_ACL_TABLE_NAME");
+        SWSS_LOG_INFO("Received update from CFG_ACL_TABLE_TABLE_NAME");
         doNatAclTableTask(consumer);
     }
     else if (table_name == CFG_ACL_RULE_TABLE_NAME)

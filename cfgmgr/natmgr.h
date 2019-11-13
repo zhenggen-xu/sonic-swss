@@ -227,7 +227,7 @@ class NatMgr : public Orch
 {
 public:
     /* NatMgr Constructor */
-    NatMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<std::string> &tableNames);
+    NatMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const std::vector<std::string> &tableNames);
     using Orch::doTask; 
 
     /* Function to be called from signal handler on nat docker stop */
