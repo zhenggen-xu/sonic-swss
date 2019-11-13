@@ -124,52 +124,52 @@ const char ip_address_delimiter = '/';
 
 /* Pool Info */
 typedef struct {
-    string ip_range;
-    string port_range;
+    std::string ip_range;
+    std::string port_range;
 } natPool_t;
 
 /* Binding Info */
 typedef struct {
-    string pool_name;
-    string acl_name;
-    string nat_type;
-    string twice_nat_id;
-    string pool_interface;
-    string acl_interface;
-    string static_key;
-    bool   twice_nat_added;
+    std::string pool_name;
+    std::string acl_name;
+    std::string nat_type;
+    std::string twice_nat_id;
+    std::string pool_interface;
+    std::string acl_interface;
+    std::string static_key;
+    bool        twice_nat_added;
 } natBinding_t;
 
 /* Static NAT Entry Info */
 typedef struct {
-    string local_ip;
-    string nat_type;
-    string twice_nat_id;
-    string interface;
-    string binding_key;
-    bool   twice_nat_added;
+    std::string local_ip;
+    std::string nat_type;
+    std::string twice_nat_id;
+    std::string interface;
+    std::string binding_key;
+    bool        twice_nat_added;
 } staticNatEntry_t;
 
 /* Static NAPT Entry Info */
 typedef struct {
-    string local_ip;
-    string local_port;
-    string nat_type;
-    string twice_nat_id;
-    string interface;
-    string binding_key;
-    bool   twice_nat_added;
+    std::string local_ip;
+    std::string local_port;
+    std::string nat_type;
+    std::string twice_nat_id;
+    std::string interface;
+    std::string binding_key;
+    bool        twice_nat_added;
 } staticNaptEntry_t;
 
 /* NAT ACL Table Rules Info */
 typedef struct{
-    string packet_action;
-    uint32_t priority;
-    string src_ip_range;
-    string dst_ip_range;
-    string src_l4_port_range;
-    string dst_l4_port_range;
-    string ip_protocol;
+    std::string packet_action;
+    uint32_t    priority;
+    std::string src_ip_range;
+    std::string dst_ip_range;
+    std::string src_l4_port_range;
+    std::string dst_l4_port_range;
+    std::string ip_protocol;
 } natAclRule_t;
 
 /* Containers to store NAT Info */
@@ -227,7 +227,7 @@ class NatMgr : public Orch
 {
 public:
     /* NatMgr Constructor */
-    NatMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<string> &tableNames);
+    NatMgr(DBConnector *cfgDb, DBConnector *appDb, DBConnector *stateDb, const vector<std::string> &tableNames);
     using Orch::doTask; 
 
     /* Function to be called from signal handler on nat docker stop */
@@ -242,10 +242,10 @@ private:
     std::shared_ptr<swss::NotificationProducer> flushNotifier;
 
     /* Declare containers to store NAT Info */
-    int     m_natTimeout;
-    int     m_natTcpTimeout;
-    int     m_natUdpTimeout;
-    string  natAdminMode;
+    int          m_natTimeout;
+    int          m_natTcpTimeout;
+    int          m_natUdpTimeout;
+    std::string  natAdminMode;
 
     natPool_map_t            m_natPoolInfo;
     natBinding_map_t         m_natBindingInfo;
@@ -270,77 +270,77 @@ private:
     /* Declare all NAT functionality member functions*/
     void enableNatFeature(void);
     void disableNatFeature(void);
-    void addConntrackSingleNatEntry(const string &key);
-    void addConntrackSingleNaptEntry(const string &key);
-    void deleteConntrackSingleNatEntry(const string &key);
-    void deleteConntrackSingleNaptEntry(const string &key);
-    void addConntrackTwiceNatEntry(const string &snatKey, const string &dnatKey);
-    void addConntrackTwiceNaptEntry(const string &snatKey, const string &dnatKey);
-    void deleteConntrackTwiceNatEntry(const string &snatKey, const string &dnatKey);
-    void deleteConntrackTwiceNaptEntry(const string &snatKey, const string &dnatKey);
-    void deleteConntrackDynamicEntries(const string &ip_range);
-    void addStaticNatEntry(const string &key);
-    void addStaticNaptEntry(const string &key);
-    void addStaticSingleNatEntry(const string &key);
-    void addStaticSingleNaptEntry(const string &key);
-    void addStaticSingleNatIptables(const string &key);
-    void addStaticSingleNaptIptables(const string &key);
-    void addStaticTwiceNatEntry(const string &key);
-    void addStaticTwiceNaptEntry(const string &key);
-    void addStaticTwiceNatIptables(const string &key);
-    void addStaticTwiceNaptIptables(const string &key);
-    void removeStaticNatEntry(const string &key);
-    void removeStaticNaptEntry(const string &key);
-    void removeStaticSingleNatEntry(const string &key);
-    void removeStaticSingleNaptEntry(const string &key);
-    void removeStaticSingleNatIptables(const string &key);
-    void removeStaticSingleNaptIptables(const string &key);
-    void removeStaticTwiceNatEntry(const string &key);
-    void removeStaticTwiceNaptEntry(const string &key);
-    void removeStaticTwiceNatIptables(const string &key);
-    void removeStaticTwiceNaptIptables(const string &key);
-    void addStaticNatEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
-    void addStaticNaptEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
-    void removeStaticNatEntries(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
-    void removeStaticNaptEntries(const string port= NONE_STRING, const string ipPrefix = NONE_STRING);
-    void addStaticNatIptables(const string port);
-    void addStaticNaptIptables(const string port);
-    void removeStaticNatIptables(const string port);
-    void removeStaticNaptIptables(const string port);
-    void addDynamicNatRule(const string &key);
-    void removeDynamicNatRule(const string &key);
-    void addDynamicNatRuleByAcl(const string &key, bool isRuleId = false);
-    void removeDynamicNatRuleByAcl(const string &key, bool isRuleId = false);
-    void addDynamicNatRules(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
-    void removeDynamicNatRules(const string port = NONE_STRING, const string ipPrefix = NONE_STRING);
-    void addDynamicTwiceNatRule(const string &key);
-    void deleteDynamicTwiceNatRule(const string &key);
-    void setDynamicAllForwardOrAclbasedRules(const string &opCmd, const string &pool_interface, const string &ip_range,
-                                             const string &port_range, const string &acls_name, const string &dynamicKey);
+    void addConntrackSingleNatEntry(const std::string &key);
+    void addConntrackSingleNaptEntry(const std::string &key);
+    void deleteConntrackSingleNatEntry(const std::string &key);
+    void deleteConntrackSingleNaptEntry(const std::string &key);
+    void addConntrackTwiceNatEntry(const std::string &snatKey, const std::string &dnatKey);
+    void addConntrackTwiceNaptEntry(const std::string &snatKey, const std::string &dnatKey);
+    void deleteConntrackTwiceNatEntry(const std::string &snatKey, const std::string &dnatKey);
+    void deleteConntrackTwiceNaptEntry(const std::string &snatKey, const std::string &dnatKey);
+    void deleteConntrackDynamicEntries(const std::string &ip_range);
+    void addStaticNatEntry(const std::string &key);
+    void addStaticNaptEntry(const std::string &key);
+    void addStaticSingleNatEntry(const std::string &key);
+    void addStaticSingleNaptEntry(const std::string &key);
+    void addStaticSingleNatIptables(const std::string &key);
+    void addStaticSingleNaptIptables(const std::string &key);
+    void addStaticTwiceNatEntry(const std::string &key);
+    void addStaticTwiceNaptEntry(const std::string &key);
+    void addStaticTwiceNatIptables(const std::string &key);
+    void addStaticTwiceNaptIptables(const std::string &key);
+    void removeStaticNatEntry(const std::string &key);
+    void removeStaticNaptEntry(const std::string &key);
+    void removeStaticSingleNatEntry(const std::string &key);
+    void removeStaticSingleNaptEntry(const std::string &key);
+    void removeStaticSingleNatIptables(const std::string &key);
+    void removeStaticSingleNaptIptables(const std::string &key);
+    void removeStaticTwiceNatEntry(const std::string &key);
+    void removeStaticTwiceNaptEntry(const std::string &key);
+    void removeStaticTwiceNatIptables(const std::string &key);
+    void removeStaticTwiceNaptIptables(const std::string &key);
+    void addStaticNatEntries(const std::string port = NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void addStaticNaptEntries(const std::string port = NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void removeStaticNatEntries(const std::string port = NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void removeStaticNaptEntries(const std::string port= NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void addStaticNatIptables(const std::string port);
+    void addStaticNaptIptables(const std::string port);
+    void removeStaticNatIptables(const std::string port);
+    void removeStaticNaptIptables(const std::string port);
+    void addDynamicNatRule(const std::string &key);
+    void removeDynamicNatRule(const std::string &key);
+    void addDynamicNatRuleByAcl(const std::string &key, bool isRuleId = false);
+    void removeDynamicNatRuleByAcl(const std::string &key, bool isRuleId = false);
+    void addDynamicNatRules(const std::string port = NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void removeDynamicNatRules(const std::string port = NONE_STRING, const std::string ipPrefix = NONE_STRING);
+    void addDynamicTwiceNatRule(const std::string &key);
+    void deleteDynamicTwiceNatRule(const std::string &key);
+    void setDynamicAllForwardOrAclbasedRules(const std::string &opCmd, const std::string &pool_interface, const std::string &ip_range,
+                                             const std::string &port_range, const std::string &acls_name, const std::string &dynamicKey);
 
     bool isNatEnabled(void);
-    bool isPortStateOk(const string &alias);
-    bool isIntfStateOk(const string &alias); 
-    bool isPoolMappedtoBinding(const string &pool_name, string &binding_name); 
-    bool isMatchesWithStaticNat(const string &global_ip, string &local_ip);
-    bool isMatchesWithStaticNapt(const string &global_ip, string &local_ip);
-    bool isGlobalIpMatching(const string &intf_keys, const string &global_ip);
-    bool getIpEnabledIntf(const string &global_ip, string &interface);
-    void setNaptPoolIpTable(const string &opCmd, const string &nat_ip, const string &nat_port);
-    bool setFullConeDnatIptablesRule(const string &opCmd);
-    bool setMangleIptablesRules(const string &opCmd, const string &interface, const string &nat_zone);
-    bool setStaticNatIptablesRules(const string &opCmd, const string &interface, const string &external_ip, const string &internal_ip, const string &nat_type);
-    bool setStaticNaptIptablesRules(const string &opCmd, const string &interface, const string &prototype, const string &external_ip, 
-                                    const string &external_port, const string &internal_ip, const string &internal_port, const string &nat_type);
-    bool setStaticTwiceNatIptablesRules(const string &opCmd, const string &interface, const string &src_ip, const string &translated_src_ip,
-                                        const string &dest_ip, const string &translated_dest_ip);
-    bool setStaticTwiceNaptIptablesRules(const string &opCmd, const string &interface, const string &prototype, const string &src_ip, const string &src_port,
-                                         const string &translated_src_ip, const string &translated_src_port, const string &dest_ip, const string &dest_port,
-                                         const string &translated_dest_ip, const string &translated_dest_port);
-    bool setDynamicNatIptablesRulesWithAcl(const string &opCmd, const string &interface, const string &external_ip,
-                                           const string &external_port_range, natAclRule_t &natAclRuleId, const string &static_key);
-    bool setDynamicNatIptablesRulesWithoutAcl(const string &opCmd, const string &interface, const string &external_ip,
-                                              const string &external_port_range, const string &static_key);
+    bool isPortStateOk(const std::string &alias);
+    bool isIntfStateOk(const std::string &alias); 
+    bool isPoolMappedtoBinding(const std::string &pool_name, std::string &binding_name); 
+    bool isMatchesWithStaticNat(const std::string &global_ip, std::string &local_ip);
+    bool isMatchesWithStaticNapt(const std::string &global_ip, std::string &local_ip);
+    bool isGlobalIpMatching(const std::string &intf_keys, const std::string &global_ip);
+    bool getIpEnabledIntf(const std::string &global_ip, std::string &interface);
+    void setNaptPoolIpTable(const std::string &opCmd, const std::string &nat_ip, const std::string &nat_port);
+    bool setFullConeDnatIptablesRule(const std::string &opCmd);
+    bool setMangleIptablesRules(const std::string &opCmd, const std::string &interface, const std::string &nat_zone);
+    bool setStaticNatIptablesRules(const std::string &opCmd, const std::string &interface, const std::string &external_ip, const std::string &internal_ip, const std::string &nat_type);
+    bool setStaticNaptIptablesRules(const std::string &opCmd, const std::string &interface, const std::string &prototype, const std::string &external_ip, 
+                                    const std::string &external_port, const std::string &internal_ip, const std::string &internal_port, const std::string &nat_type);
+    bool setStaticTwiceNatIptablesRules(const std::string &opCmd, const std::string &interface, const std::string &src_ip, const std::string &translated_src_ip,
+                                        const std::string &dest_ip, const std::string &translated_dest_ip);
+    bool setStaticTwiceNaptIptablesRules(const std::string &opCmd, const std::string &interface, const std::string &prototype, const std::string &src_ip, const std::string &src_port,
+                                         const std::string &translated_src_ip, const std::string &translated_src_port, const std::string &dest_ip, const std::string &dest_port,
+                                         const std::string &translated_dest_ip, const std::string &translated_dest_port);
+    bool setDynamicNatIptablesRulesWithAcl(const std::string &opCmd, const std::string &interface, const std::string &external_ip,
+                                           const std::string &external_port_range, natAclRule_t &natAclRuleId, const std::string &static_key);
+    bool setDynamicNatIptablesRulesWithoutAcl(const std::string &opCmd, const std::string &interface, const std::string &external_ip,
+                                              const std::string &external_port_range, const std::string &static_key);
 
 };
 
