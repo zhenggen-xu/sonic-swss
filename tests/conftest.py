@@ -157,8 +157,7 @@ class DockerVirtualSwitch(object):
         self.syncd = ['syncd']
         self.rtd   = ['fpmsyncd', 'zebra']
         self.teamd = ['teamsyncd', 'teammgrd']
-        self.natd = ['natsyncd', 'natmgrd']
-        self.alld  = self.basicd + self.swssd + self.syncd + self.rtd + self.teamd + self.natd
+        self.alld  = self.basicd + self.swssd + self.syncd + self.rtd + self.teamd
         self.client = docker.from_env()
 
         if subprocess.check_call(["/sbin/modprobe", "team"]) != 0:
