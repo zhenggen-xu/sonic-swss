@@ -27,8 +27,10 @@
 #include "nfnetlink.h"
 #include "timer.h"
 #include "routeorch.h"
-#include "debugdumporch.h"
 #include "nexthopgroupkey.h"
+#ifdef DEBUG_FRAMEWORK
+#include "debugdumporch.h"
+#endif
 
 #define VALUES                            "Values" // Global Values Key
 #define NAT_HITBIT_N_CNTRS_QUERY_PERIOD   5        // 5 secs
