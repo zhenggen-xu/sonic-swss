@@ -569,10 +569,6 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                                 /* If a matching Static NAPT entry exists in the APP_DB,
                                  * it has higher priority than the dynamic napt entry. */
                                 SWSS_LOG_INFO("SNAPT %s: static entry exists, not processing the NAPT notification", opStr.c_str());
-                                if (m_AppRestartAssist->isWarmStartInProgress())
-                                {
-                                    m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, key, fvVector, (!addFlag));
-                                }
                                 return 1;
                             }
                         }
@@ -583,24 +579,17 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
+                            /* Skip entry, if entry contains loopback destination address */
+                            if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
+                                (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
                             {
-                                m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, key, fvVector, true);
+                                SWSS_LOG_INFO("SNAPT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
+                                return 1;
                             }
                             else
                             {
-                                /* Skip entry, if entry contains loopback destination address */
-                                if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
-                                    (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
-                                {
-                                    SWSS_LOG_INFO("SNAPT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
-                                    return 1;
-                                }
-                                else
-                                {
-                                    m_naptTable.del(key);
-                                    SWSS_LOG_NOTICE("SNAPT entry with key %s deleted from APP_DB", key.c_str());
-                                }
+                                m_naptTable.del(key);
+                                SWSS_LOG_NOTICE("SNAPT entry with key %s deleted from APP_DB", key.c_str());
                             }
                         }
                     }
@@ -613,10 +602,6 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                                 /* If a matching Static NAPT entry exists in the APP_DB,
                                  * it has higher priority than the dynamic napt entry. */
                                 SWSS_LOG_INFO("SNAPT %s: static reverse entry exists, not processing dynamic NAPT entry", opStr.c_str());
-                                if (m_AppRestartAssist->isWarmStartInProgress())
-                                {
-                                    m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, reverseEntryKey, reverseFvVector, (!addFlag));
-                                }
                                 return 1;
                             }
                         }
@@ -627,24 +612,17 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
+                            /* Skip entry, if entry contains loopback destination address */
+                            if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
+                                (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
                             {
-                                m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, reverseEntryKey, reverseFvVector, true);
+                                SWSS_LOG_INFO("SNAPT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
+                                return 1;
                             }
                             else
                             {
-                                /* Skip entry, if entry contains loopback destination address */
-                                if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
-                                    (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
-                                {
-                                    SWSS_LOG_INFO("SNAPT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
-                                    return 1;
-                                }
-                                else
-                                {
-                                    m_naptTable.del(reverseEntryKey);
-                                    SWSS_LOG_NOTICE("Implicit DNAPT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
-                                }
+                                m_naptTable.del(reverseEntryKey);
+                                SWSS_LOG_NOTICE("Implicit DNAPT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
                             }
                         }
                     }
@@ -701,10 +679,6 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                                 /* If a matching Static NAT entry exists in the APP_DB,
                                  * it has higher priority than the dynamic napt entry. */
                                 SWSS_LOG_INFO("SNAT %s: static entry exists, not processing the NAT notification", opStr.c_str());
-                                if (m_AppRestartAssist->isWarmStartInProgress())
-                                {
-                                    m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, key, fvVector, (!addFlag));
-                                }
                                 return 1;
                             }
                         }
@@ -715,24 +689,17 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
+                            /* Skip entry, if entry contains loopback destination address */
+                            if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
+                                (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
                             {
-                                m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, key, fvVector, true);
+                                SWSS_LOG_INFO("SNAT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
+                                return 1;
                             }
                             else
                             {
-                                /* Skip entry, if entry contains loopback destination address */
-                                if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
-                                    (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
-                                {
-                                    SWSS_LOG_INFO("SNAT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
-                                    return 1;
-                                }
-                                else
-                                {
-                                    m_natTable.del(key);
-                                    SWSS_LOG_NOTICE("SNAT entry with key %s deleted from APP_DB", key.c_str());
-                                }
+                                m_natTable.del(key);
+                                SWSS_LOG_NOTICE("SNAT entry with key %s deleted from APP_DB", key.c_str());
                             }
                         }
                     }
@@ -745,10 +712,6 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                                 /* If a matching Static NAT entry exists in the APP_DB,
                                  * it has higher priority than the dynamic napt entry. */
                                 SWSS_LOG_INFO("SNAT %s: static reverse entry exists, not adding dynamic NAT entry", opStr.c_str());
-                                if (m_AppRestartAssist->isWarmStartInProgress())
-                                {
-                                    m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, reverseEntryKey, reverseFvVector, (!addFlag));
-                                }
                                 return 1;
                             }
                         }
@@ -759,24 +722,17 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
+                            /* Skip entry, if entry contains loopback destination address */
+                            if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
+                                (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
                             {
-                                m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, reverseEntryKey, reverseFvVector, true);
+                                SWSS_LOG_INFO("SNAT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
+                                return 1;
                             }
                             else
                             {
-                                /* Skip entry, if entry contains loopback destination address */
-                                if ((IS_LOOPBACK_ADDR(ntohl(entry.orig_dest_ip.getV4Addr()))) ||
-                                    (IS_LOOPBACK_ADDR(ntohl(entry.nat_dest_ip.getV4Addr()))))
-                                {
-                                    SWSS_LOG_INFO("SNAT %s: static entry contains loopback address, ignoring the notification", opStr.c_str());
-                                    return 1;
-                                }
-                                else
-                                {
-                                    m_natTable.del(reverseEntryKey);
-                                    SWSS_LOG_NOTICE("Implicit DNAT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
-                                }
+                                m_natTable.del(reverseEntryKey);
+                                SWSS_LOG_NOTICE("Implicit DNAT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
                             }
                         }
                     }
@@ -860,15 +816,8 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
-                            {
-                                m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, key, fvVector, true);
-                            }
-                            else
-                            {
-                                m_naptTable.del(key);
-                                SWSS_LOG_NOTICE("DNAPT entry with key %s deleted from APP_DB", key.c_str());
-                            }
+                            m_naptTable.del(key);
+                            SWSS_LOG_NOTICE("DNAPT entry with key %s deleted from APP_DB", key.c_str());
                         }
                      }
                      if ((reverseEntryExists = m_naptCheckTable.get(reverseEntryKey, values)))
@@ -890,15 +839,8 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         {
-                            if (m_AppRestartAssist->isWarmStartInProgress())
-                            {
-                                m_AppRestartAssist->insertToMap(APP_NAPT_TABLE_NAME, reverseEntryKey, reverseFvVector, true);
-                            }
-                            else
-                            {
-                                m_naptTable.del(reverseEntryKey);
-                                SWSS_LOG_NOTICE("Implicit SNAPT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
-                            }
+                            m_naptTable.del(reverseEntryKey);
+                            SWSS_LOG_NOTICE("Implicit SNAPT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
                         }
                     }
                 }
@@ -953,15 +895,8 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         { 
-                            if (m_AppRestartAssist->isWarmStartInProgress())
-                            {
-                                m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, key, fvVector, true);
-                            }
-                            else
-                            {
-                                m_natTable.del(key);
-                                SWSS_LOG_NOTICE("DNAT entry with key %s deleted from APP_DB", key.c_str());
-                            }
+                            m_natTable.del(key);
+                            SWSS_LOG_NOTICE("DNAT entry with key %s deleted from APP_DB", key.c_str());
                         }
                     }
                     if ((reverseEntryExists = m_natCheckTable.get(reverseEntryKey, values)))
@@ -983,15 +918,8 @@ int NatSync::addNatEntry(struct nfnl_ct *ct, struct naptEntry &entry, bool addFl
                         }
                         else
                         { 
-                            if (m_AppRestartAssist->isWarmStartInProgress())
-                            {
-                                m_AppRestartAssist->insertToMap(APP_NAT_TABLE_NAME, reverseEntryKey, reverseFvVector, true);
-                            }
-                            else
-                            {
-                                m_natTable.del(reverseEntryKey);
-                                SWSS_LOG_NOTICE("Implicit SNAT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
-                            }
+                            m_natTable.del(reverseEntryKey);
+                            SWSS_LOG_NOTICE("Implicit SNAT entry with key %s deleted from APP_DB", reverseEntryKey.c_str());
                         }
                     }
                 }
