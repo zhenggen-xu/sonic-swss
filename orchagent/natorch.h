@@ -173,7 +173,7 @@ struct DnatEntries
 
 typedef std::map<IpAddress, DnatEntries> DnatNhResolvCache;
 
-class NatOrch: public Orch, public Subject, public Observer, public DebugDump
+class NatOrch: public Orch, public Subject, public Observer
 {
 public:
 
