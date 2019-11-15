@@ -206,6 +206,12 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
         return;
     }
 
+    /* If this is a bridge port, return */
+    if (master)
+    {
+        return;
+    }
+
     /* In the event of swss restart, it is possible to get netlink messages during bridge
      * delete, interface delete etc which are part of cleanup. These netlink messages for
      * the front-panel interface must not be published or it will update the statedb with
@@ -236,15 +242,11 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     vector<FieldValueTuple> temp;
     if (m_portTable.get(key, temp))
     {
-        /* Host interface is created */
-        if (!g_init && g_portSet.find(key) != g_portSet.end())
-        {
-            g_portSet.erase(key);
-            FieldValueTuple tuple("state", "ok");
-            vector<FieldValueTuple> vector;
-            vector.push_back(tuple);
-            m_statePortTable.set(key, vector);
-            SWSS_LOG_NOTICE("Publish %s(ok) to state db", key.c_str());
-        }
+        g_portSet.erase(key);
+        FieldValueTuple tuple("state", "ok");
+        vector<FieldValueTuple> vector;
+        vector.push_back(tuple);
+        m_statePortTable.set(key, vector);
+        SWSS_LOG_NOTICE("Publish %s(ok) to state db", key.c_str());
     }
 }
