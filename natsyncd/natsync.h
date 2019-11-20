@@ -25,6 +25,7 @@
 #include "nfnetlink.h"
 #include <linux/netfilter/nfnetlink_conntrack.h>
 #include <linux/netfilter/nf_conntrack_common.h>
+#include <unistd.h>
 
 // The timeout value (in seconds) for natsyncd reconcilation logic
 #define DEFAULT_NATSYNC_WARMSTART_TIMER 30
@@ -46,6 +47,7 @@ public:
     virtual void onMsg(int nlmsg_type, struct nl_object *obj);
 
     bool isNatRestoreDone();
+    bool isPortInitDone(DBConnector *app_db);
 
     AppRestartAssist *getRestartAssist()
     {

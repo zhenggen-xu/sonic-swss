@@ -61,6 +61,27 @@ NatSync::NatSync(RedisPipeline *pipelineAppDB, DBConnector *appDb, DBConnector *
     }
 }
 
+/* To check the port init is done or not */
+bool NatSync::isPortInitDone(DBConnector *app_db)
+{
+    bool portInit = 0;
+    long cnt = 0;
+
+    while(!portInit) {
+        Table portTable(app_db, APP_PORT_TABLE_NAME);
+        std::vector<FieldValueTuple> tuples;
+        portInit = portTable.get("PortInitDone", tuples);
+
+        if(portInit)
+            break;
+        sleep(1);
+        cnt++;
+    }
+    sleep(5);
+    SWSS_LOG_NOTICE("PORT_INIT_DONE : %d %ld", portInit, cnt);
+    return portInit;
+}
+
 // Check if nat conntrack entries are restored in kernel
 bool NatSync::isNatRestoreDone()
 {

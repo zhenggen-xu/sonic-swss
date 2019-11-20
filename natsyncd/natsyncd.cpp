@@ -23,6 +23,8 @@ int main(int argc, char **argv)
     nfnl.registerRecvCallbacks();
     NatSync sync(&pipelineAppDB, &appDb, &stateDb, &nfnl);
 
+    sync.isPortInitDone(&appDb);
+
     NetDispatcher::getInstance().registerMessageHandler(NFNLMSG_TYPE(NFNL_SUBSYS_CTNETLINK, IPCTNL_MSG_CT_NEW), &sync);
     NetDispatcher::getInstance().registerMessageHandler(NFNLMSG_TYPE(NFNL_SUBSYS_CTNETLINK, IPCTNL_MSG_CT_DELETE), &sync);
 
@@ -65,7 +67,7 @@ int main(int argc, char **argv)
             nfnl.registerGroup(NFNLGRP_CONNTRACK_UPDATE);
             nfnl.registerGroup(NFNLGRP_CONNTRACK_DESTROY);
 
-            cout << "Listens to conntrack messages..." << endl;
+            SWSS_LOG_INFO("Listens to conntrack messages...");
             nfnl.dumpRequest(IPCTNL_MSG_CT_GET);
 
             s.addSelectable(&nfnl);
@@ -89,7 +91,7 @@ int main(int argc, char **argv)
         }
         catch (const std::exception& e)
         {
-            cout << "Exception \"" << e.what() << "\" had been thrown in daemon" << endl;
+            SWSS_LOG_ERROR("Runtime error: %s", e.what());
             return 0;
         }
     }
