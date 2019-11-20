@@ -6574,8 +6574,6 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
         string key = kfvKey(t), nat_zone = "1";
         vector<string> keys = tokenize(kfvKey(t), config_db_key_delimiter);
         string op = kfvOp(t), port(keys[0]);
-        uint32_t ipv4_addr;
-        struct in6_addr ipv6_addr;
         bool skipAddition = false, skipDeletion = false;
         int prefixLen = 0, nat_zone_value = 1;
         vector<string> ipPrefixKeys;
@@ -6625,16 +6623,19 @@ void NatMgr::doNatIpInterfaceTask(Consumer &consumer)
             }
 
             /* Ensure the ip address is ipv4, otherwise ignore */
-            if (inet_pton(AF_INET6, ipPrefixKeys[0].c_str(), &ipv6_addr))
+            try
             {
-                /* Ignore the IPv6 addresses */
-                SWSS_LOG_INFO("IPv6 address is not supported, skipping %s", key.c_str());
-                it = consumer.m_toSync.erase(it);
-                continue;
+                IpAddress ipAddress(ipPrefixKeys[0]);
+
+                if (!ipAddress.isV4())
+                {
+                    /* Ignore the IPv6 addresses */
+                    SWSS_LOG_INFO("IPv6 address is not supported, skipping %s", key.c_str());
+                    it = consumer.m_toSync.erase(it);
+                    continue;
+                }
             }
- 
-            /* Ensure the ip format is x.x.x.x, otherwise ignore */
-            if (inet_pton(AF_INET, ipPrefixKeys[0].c_str(), &ipv4_addr) != 1)
+            catch(...)
             {
                 SWSS_LOG_INFO("Invalid ip address %s format, skipping %s", ipPrefixKeys[0].c_str(), key.c_str());
                 it = consumer.m_toSync.erase(it);
