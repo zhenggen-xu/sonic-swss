@@ -136,6 +136,8 @@ int main(int argc, char **argv)
         }
 
         natmgr = new NatMgr(&cfgDb, &appDb, &stateDb, cfg_tables);
+
+        natmgr->isPortInitDone(&appDb);
         
         std::vector<Orch *> cfgOrchList = {natmgr};
 
