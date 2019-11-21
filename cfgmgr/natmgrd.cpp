@@ -62,7 +62,6 @@ void sigterm_handler(int signo)
     int ret = 0;
     std::string res;
     const std::string iptablesFlushNat          = "iptables -t nat -F";
-    const std::string iptablesFlushMangle       = "iptables -t mangle -F";
     const std::string conntrackFlush            = "conntrack -F";
 
     SWSS_LOG_NOTICE("Got SIGTERM");
@@ -72,11 +71,6 @@ void sigterm_handler(int signo)
     if (ret)
     {
         SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushNat.c_str(), ret);
-    }
-    ret = swss::exec(iptablesFlushMangle, res);
-    if (ret)
-    {
-        SWSS_LOG_ERROR("Command '%s' failed with rc %d", iptablesFlushMangle.c_str(), ret);
     }
     ret = swss::exec(conntrackFlush, res);
     if (ret)
@@ -96,6 +90,7 @@ void sigterm_handler(int signo)
     
     if (natmgr)
     {
+        natmgr->cleanupMangleIpTables();
         natmgr->cleanupPoolIpTable();
     }
 }

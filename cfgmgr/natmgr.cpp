@@ -264,6 +264,20 @@ void NatMgr::cleanupPoolIpTable(void)
     }
 }
 
+/* This is ideally called on docker stop  */
+void NatMgr::cleanupMangleIpTables(void)
+{
+    SWSS_LOG_INFO("Cleaning the Mangle IpTables");
+    for (auto it = m_natZoneInterfaceInfo.begin(); it != m_natZoneInterfaceInfo.end(); it++)
+    {
+        /* Delete the mangle iptables rules for non-loopback interface */
+        if (strncmp((*it).first.c_str(), LOOPBACK_PREFIX, strlen(LOOPBACK_PREFIX)))
+        {
+            setMangleIptablesRules(DELETE, (*it).first, (*it).second);
+        }
+    }
+}
+
 /* To Add/Delete NAPT pool ip table to APPL_DB */
 void NatMgr::setNaptPoolIpTable(const string &opCmd, const string &ip_range, const string &port_range)
 {

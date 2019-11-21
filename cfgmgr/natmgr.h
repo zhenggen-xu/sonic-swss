@@ -231,7 +231,8 @@ public:
     using Orch::doTask; 
 
     /* Function to be called from signal handler on nat docker stop */
-    void cleanupPoolIpTable(void);
+    void cleanupPoolIpTable();
+    void cleanupMangleIpTables();
     bool isPortInitDone(DBConnector *app_db);
    
 private:
