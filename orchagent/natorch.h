@@ -236,7 +236,7 @@ private:
     int              totalDynamicTwiceNaptEntries;
     int              totalSnatEntries;
     int              totalDnatEntries;
-    int              maxAllowedNatEntries;
+    int              maxAllowedSNatEntries;
     string           admin_mode;
 
     void doTask(Consumer& consumer);

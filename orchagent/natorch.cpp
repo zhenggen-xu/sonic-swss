@@ -94,28 +94,28 @@ NatOrch::NatOrch(DBConnector *appDb, DBConnector *stateDb, vector<table_name_wit
     auto executor   = new ExecutableTimer(m_natQueryTimer, this, "NAT_HITBIT_N_CNTRS_QUERY_TIMER");
     Orch::addExecutor(executor);
 
-    /* Get the Maximum supported entries */
+    /* Get the Maximum supported SNAT entries */
     SWSS_LOG_INFO("Get the Maximum supported SNAT entries");
     sai_status_t     status;
     sai_attribute_t  attr;
     memset(&attr, 0, sizeof(attr));
     attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
-    maxAllowedNatEntries = 0;
+    maxAllowedSNatEntries = 0;
 
     status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
     if (status != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_ERROR("Failed to get the SNAT available entry count, rv:%d", status);
+        SWSS_LOG_NOTICE("Failed to get the SNAT available entry count, rv:%d", status);
     }
     else
     {
-        maxAllowedNatEntries = attr.value.u32;
+        maxAllowedSNatEntries = attr.value.u32;
     }
 
     /* Set default values and Max entries to counter DB */
     std::vector<swss::FieldValueTuple> values;
     std::string key = "Values";
-    swss::FieldValueTuple p("MAX_NAT_ENTRIES", to_string(maxAllowedNatEntries));
+    swss::FieldValueTuple p("MAX_NAT_ENTRIES", to_string(maxAllowedSNatEntries));
     swss::FieldValueTuple q("TIMEOUT", to_string(timeout));
     swss::FieldValueTuple r("UDP_TIMEOUT", to_string(udp_timeout));
     swss::FieldValueTuple s("TCP_TIMEOUT", to_string(tcp_timeout));
@@ -1734,7 +1734,7 @@ bool NatOrch::addNatEntry(const IpAddress &ip_address, const NatEntryValue &entr
     if ((entry.nat_type == "snat") and
         (entry.entry_type == "dynamic"))
     {
-       if (totalSnatEntries == maxAllowedNatEntries)
+       if (totalSnatEntries == maxAllowedSNatEntries)
        {
             SWSS_LOG_INFO("Reached the max allowed NAT entries in the hardware, dropping new SNAT translation with ip %s and translated ip %s",
                            ip_address.to_string().c_str(), entry.translated_ip.to_string().c_str());
@@ -1831,7 +1831,7 @@ bool NatOrch::addTwiceNatEntry(const TwiceNatEntryKey &key, const TwiceNatEntryV
 
     if (value.entry_type == "dynamic")
     {
-       if (totalSnatEntries == maxAllowedNatEntries)
+       if (totalSnatEntries == maxAllowedSNatEntries)
        {
             SWSS_LOG_INFO("Reached the max allowed NAT entries in the hardware, dropping new Twice NAT translation with src ip %s, dst ip %s and translated src ip %s, dst ip %s",
                            key.src_ip.to_string().c_str(), key.dst_ip.to_string().c_str(), value.translated_src_ip.to_string().c_str(), value.translated_dst_ip.to_string().c_str());
@@ -1930,7 +1930,7 @@ bool NatOrch::addNaptEntry(const NaptEntryKey &keyEntry, const NaptEntryValue &e
     if ((entry.nat_type == "snat") and 
         (entry.entry_type == "dynamic"))
     {
-       if (totalSnatEntries == maxAllowedNatEntries)
+       if (totalSnatEntries == maxAllowedSNatEntries)
        {
             SWSS_LOG_INFO("Reached the max allowed NAT entries in the hardware, dropping new SNAPT translation with ip %s, port %d, prototype %s, translated ip %s, translated port %d",
                           keyEntry.ip_address.to_string().c_str(), keyEntry.l4_port,
@@ -2081,7 +2081,7 @@ bool NatOrch::addTwiceNaptEntry(const TwiceNaptEntryKey &key, const TwiceNaptEnt
 
     if (value.entry_type == "dynamic")
     {
-       if (totalSnatEntries == maxAllowedNatEntries)
+       if (totalSnatEntries == maxAllowedSNatEntries)
        {
             SWSS_LOG_INFO("Reached the max allowed NAT entries in the hardware, dropping new Twice SNAPT translation with src ip %s, src port %d, prototype %s, \
                            dst ip %s, dst port %d",
@@ -2333,9 +2333,9 @@ void NatOrch::enableNatFeature(void)
 
     SWSS_LOG_INFO("Verify NAT is supported or not");
 
-    if (maxAllowedNatEntries == 0)
+    if (maxAllowedSNatEntries == 0)
     {
-        SWSS_LOG_ERROR("NAT Feature is not supported in this Platform");
+        SWSS_LOG_NOTICE("NAT Feature is not supported in this Platform");
         return;
     }
     else
@@ -4554,7 +4554,7 @@ void NatOrch::debugdumpALL()
     SWSS_DEBUG_PRINT(m_dbgCompName, "    Total Dynamic Twice Napt Entries: %d", totalDynamicTwiceNaptEntries);
     SWSS_DEBUG_PRINT(m_dbgCompName, "    Total Snat Entries              : %d", totalSnatEntries);
     SWSS_DEBUG_PRINT(m_dbgCompName, "    Total Dnat Entries              : %d", totalDnatEntries);
-    SWSS_DEBUG_PRINT(m_dbgCompName, "    Max allowed NAT entries         : %d", maxAllowedNatEntries);
+    SWSS_DEBUG_PRINT(m_dbgCompName, "    Max allowed NAT entries         : %d", maxAllowedSNatEntries);
 
     SWSS_DEBUG_PRINT(m_dbgCompName, "\n\nNatOrch NAT entries Cache");
     SWSS_DEBUG_PRINT(m_dbgCompName, "--------------------------");

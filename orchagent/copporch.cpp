@@ -72,7 +72,7 @@ static map<string, sai_hostif_trap_type_t> trap_id_map = {
     {"ttl_error", SAI_HOSTIF_TRAP_TYPE_TTL_ERROR},
     {"udld", SAI_HOSTIF_TRAP_TYPE_UDLD},
     {"bfd", SAI_HOSTIF_TRAP_TYPE_BFD},
-    {"bfdv6", SAI_HOSTIF_TRAP_TYPE_BFDV6}
+    {"bfdv6", SAI_HOSTIF_TRAP_TYPE_BFDV6},
     {"src_nat_miss", SAI_HOSTIF_TRAP_TYPE_SNAT_MISS},
     {"dest_nat_miss", SAI_HOSTIF_TRAP_TYPE_DNAT_MISS}
 };
@@ -102,6 +102,7 @@ CoppOrch::CoppOrch(vector<TableConnector> &tableConnectors) :
     initDefaultTrapGroup();
     initDefaultTrapIds();
     enable_sflow_trap = false;
+    getNatSupportedInfo();
 };
 
 void CoppOrch::initDefaultHostIntfTable()
@@ -182,6 +183,33 @@ void CoppOrch::initDefaultTrapGroup()
     m_trap_group_map[default_trap_group] = attr.value.oid;
 }
 
+void CoppOrch::getNatSupportedInfo()
+{
+    SWSS_LOG_ENTER();
+
+    sai_status_t     status;
+    sai_attribute_t  attr;
+
+    SWSS_LOG_INFO("Verify NAT is supported or not");
+
+    memset(&attr, 0, sizeof(attr));
+    attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
+    isNatSupported = false;
+
+    status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_NOTICE("Failed to get the SNAT available entry count, rv:%d", status);
+    }
+    else
+    {
+        if (attr.value.u32 != 0)
+        {
+            isNatSupported = true;
+        }
+    }
+}
+
 void CoppOrch::getTrapIdList(vector<string> &trap_id_name_list, vector<sai_hostif_trap_type_t> &trap_id_list) const
 {
     SWSS_LOG_ENTER();
@@ -191,6 +219,12 @@ void CoppOrch::getTrapIdList(vector<string> &trap_id_name_list, vector<sai_hosti
         SWSS_LOG_DEBUG("processing trap_id:%s", trap_id_str.c_str());
         trap_id = trap_id_map.at(trap_id_str);
         SWSS_LOG_DEBUG("Pushing trap_id:%d", trap_id);
+        if (((trap_id == SAI_HOSTIF_TRAP_TYPE_SNAT_MISS) or (trap_id == SAI_HOSTIF_TRAP_TYPE_DNAT_MISS)) and
+            (isNatSupported == false))
+        {
+            SWSS_LOG_NOTICE("Ignoring the trap_id: %s, as NAT is not supported", trap_id_str.c_str());
+            continue;
+        }
         trap_id_list.push_back(trap_id);
     }
 }
