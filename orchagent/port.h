@@ -18,7 +18,6 @@ extern "C" {
  * hence setting to 1492 (1514 - 22)
  */
 #define DEFAULT_MTU             1492
-#define MAX_DEPENDENCY          10 
 
 namespace swss {
 
@@ -106,6 +105,19 @@ public:
     uint8_t m_pfc_bitmask = 0;
     std::unordered_set<sai_object_id_t> m_ingress_acl_tables_uset;
     std::unordered_set<sai_object_id_t> m_egress_acl_tables_uset;
+
+    inline void set_dependency(Dependency dep)
+    {
+        m_dependency_bitmap |= (1 << dep);
+    }
+    inline void clear_dependency(Dependency dep)
+    {
+        m_dependency_bitmap &= ~(1 << dep);
+    }
+    inline bool has_dependency()
+    {
+        return (m_dependency_bitmap != 0);
+    }
 };
 
 }

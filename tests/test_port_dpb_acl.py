@@ -47,6 +47,7 @@ class TestPortDPBAcl(object):
         dvs.remove_acl_table("test1")
         time.sleep(2)
         dvs.verify_acl_group_num(0)
+
     '''
     @pytest.mark.skip()
     '''
@@ -67,7 +68,8 @@ class TestPortDPBAcl(object):
 
         # Update bind list and verify
         bind_ports = ["Ethernet4"]
-        dvs.create_acl_table("test", "L3", bind_ports)
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
         time.sleep(2)
         dvs.verify_acl_group_num(1)
         acl_group_ids = dvs.get_acl_group_ids()
@@ -81,7 +83,8 @@ class TestPortDPBAcl(object):
 
         #Update bind list and verify
         bind_ports = ["Ethernet0", "Ethernet1", "Ethernet2", "Ethernet3","Ethernet4"]
-        dvs.create_acl_table("test", "L3", bind_ports)
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
         time.sleep(2)
         dvs.verify_acl_group_num(5)
         acl_group_ids = dvs.get_acl_group_ids()
@@ -95,7 +98,8 @@ class TestPortDPBAcl(object):
 
         # Update bind list and verify
         bind_ports = ["Ethernet4"]
-        dvs.create_acl_table("test", "L3", bind_ports)
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
         dvs.verify_acl_group_num(1)
         acl_group_ids = dvs.get_acl_group_ids()
         dvs.verify_acl_group_member(acl_group_ids[0], acl_table_ids[0])
@@ -107,7 +111,8 @@ class TestPortDPBAcl(object):
 
         # Update bind list and verify
         bind_ports = ["Ethernet0", "Ethernet4"]
-        dvs.create_acl_table("test", "L3", bind_ports)
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
         time.sleep(2)
         dvs.verify_acl_group_num(2)
         acl_group_ids = dvs.get_acl_group_ids()

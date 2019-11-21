@@ -816,6 +816,10 @@ class DockerVirtualSwitch(object):
         tbl._del(table)
         time.sleep(1)
 
+    def update_acl_table(self, table, fvs):
+        tbl.set(table, fvs)
+        time.sleep(1) 
+
     def get_acl_table_ids(self):
         tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
         keys = tbl.getKeys()

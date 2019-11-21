@@ -560,13 +560,8 @@ bool PfcWdSwOrch<DropHandler, ForwardHandler>::registerInWdDb(const Port& port,
                 sai_serialize_object_id(queueId));
     }
 
-#if 0
-    // Create egress ACL table group for each port of pfcwd's interest
-    sai_object_id_t groupId;
-    gPortsOrch->createBindAclTableGroup(port.m_port_id, groupId, ACL_STAGE_INGRESS);
-    gPortsOrch->createBindAclTableGroup(port.m_port_id, groupId, ACL_STAGE_EGRESS);
-#endif
-
+    // We do NOT need to create ACL table group here. It will be
+    // done when ACL tables are bound to ports
     return true;
 }
 

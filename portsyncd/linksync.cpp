@@ -178,7 +178,6 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
     int master = rtnl_link_get_master(link);
     char *type = rtnl_link_get_type(link);
 
-    SWSS_LOG_NOTICE("Vasant in onMsg");
     if (type)
     {
         SWSS_LOG_NOTICE("nlmsg type:%d key:%s admin:%d oper:%d addr:%s ifindex:%d master:%d type:%s",

@@ -400,7 +400,7 @@ public:
 
     bool addAclTable(AclTable &aclTable);
     bool removeAclTable(string table_id);
-    bool updateAclTable(AclTable &newTable, sai_object_id_t table_oid);
+    bool updateAclTable(AclTable &currentTable, AclTable &newTable);
     bool addAclRule(shared_ptr<AclRule> aclRule, string table_id);
     bool removeAclRule(string table_id, string rule_id);
 
@@ -440,7 +440,6 @@ private:
     bool processAclTableType(string type, acl_table_type_t &table_type);
     bool isAclTableStageUpdated(acl_stage_type_t acl_stage, AclTable &aclTable);
     bool processAclTableStage(string stage, acl_stage_type_t &acl_stage);
-    bool isAclTablePortListUpdated(string portList, AclTable &aclTable);
     bool processAclTablePorts(string portList, AclTable &aclTable);
     bool validateAclTable(AclTable &aclTable);
     bool updateAclTablePorts(AclTable &newTable, AclTable &curTable);
