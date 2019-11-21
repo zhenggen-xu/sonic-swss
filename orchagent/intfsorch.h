@@ -43,8 +43,11 @@ public:
     bool setRouterIntfsMtu(const Port &port);
     bool setRouterIntfsAdminStatus(const Port &port);
     bool setRouterIntfsNatZoneId(Port &port, uint32_t &nat_zone_id);
+    void getNatSupportedInfo();
+
     std::set<IpPrefix> getSubnetRoutes();
     std::map<string, uint32_t> m_nat_zone;
+    bool isNatSupported;
 
     void generateInterfaceMap();
     void addRifToFlexCounter(const string&, const string&, const string&);
