@@ -2144,7 +2144,8 @@ void PortsOrch::doPortTask(Consumer &consumer)
             if (m_portList[alias].has_dependency())
             {
                 // Port has one or more dependencies, cannot remove
-                SWSS_LOG_WARN("Cannot to remove port because of dependency"); 
+                SWSS_LOG_WARN("Please remove port dependenc(y/ies):%s",
+                               m_portList[alias].print_dependency().c_str()); 
                 it++;
                 continue;
             }
@@ -2348,9 +2349,14 @@ void PortsOrch::doVlanMemberTask(Consumer &consumer)
             }
 
             if (addBridgePort(port) && addVlanMember(vlan, port, tagging_mode))
+            {
+                m_portList[port.m_alias].set_dependency(Port::VLAN_DEP);
                 it = consumer.m_toSync.erase(it);
+            }
             else
-                it++;
+            {
+                it++; //continue?
+            }
         }
         else if (op == DEL_COMMAND)
         {
@@ -2361,6 +2367,8 @@ void PortsOrch::doVlanMemberTask(Consumer &consumer)
                     if (port.m_vlan_members.empty())
                     {
                         removeBridgePort(port);
+                      
+                        m_portList[port.m_alias].clear_dependency(Port::VLAN_DEP);
                     }
                     it = consumer.m_toSync.erase(it);
                 }

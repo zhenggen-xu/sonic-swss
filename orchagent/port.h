@@ -53,8 +53,17 @@ public:
             FDB_DEP,
             INTF_DEP,
             LAG_DEP,
-            VLAN_DEP
+            VLAN_DEP,
+            MAX_DEP
     };
+    std::unordered_map<Dependency, std::string> 
+        m_dependency_string = {
+            {ACL_DEP, "ACL"},
+            {FDB_DEP, "FDB"},
+            {INTF_DEP, "INTF"},
+            {LAG_DEP, "LAG"},
+            {VLAN_DEP, "VLAN"}
+        };
 
     Port() {};
     Port(std::string alias, Type type) :
@@ -117,6 +126,22 @@ public:
     inline bool has_dependency()
     {
         return (m_dependency_bitmap != 0);
+    }
+    std::string print_dependency()
+    {
+        std::string deps="";
+        uint32_t dep_bitmap = m_dependency_bitmap;
+       
+        for (int dep = ACL_DEP; dep < MAX_DEP && dep_bitmap; ++dep)
+        {
+            uint32_t mask = (1 << dep);
+
+            if (dep_bitmap & mask) {
+                deps += m_dependency_string[static_cast<Dependency>(dep)] + " ";
+                dep_bitmap &= ~mask;
+            }
+        }
+        return deps; 
     }
 };
 

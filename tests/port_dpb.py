@@ -26,6 +26,7 @@ class Port():
         self._app_db_ptbl = swsscommon.Table(self._app_db, swsscommon.APP_PORT_TABLE_NAME)
         self._asic_db = swsscommon.DBConnector(swsscommon.ASIC_DB, dvs.redis_sock, 0)
         self._asic_db_ptbl = swsscommon.Table(self._asic_db, "ASIC_STATE:SAI_OBJECT_TYPE_PORT")
+        self._counters_db = redis.Redis(unix_socket_path=self._dvs.redis_sock, db=swsscommon.COUNTERS_DB)
 
     def set_name(self, name):
         self._name = name
@@ -50,6 +51,9 @@ class Port():
 
     def set_index(self, index):
         self._index = index
+
+    def set_oid(self, oid = None):
+        self._oid = oid 
 
     def get_speed(self):
         return self._speed
@@ -129,6 +133,7 @@ class Port():
     def delete_from_config_db(self):
         self._cfg_db_ptbl._del(self.get_name())
         self._oid = None
+        time.sleep(2)
 
     def sync_from_config_db(self):
         (status, fvs) = self._cfg_db_ptbl.get(self.get_name())
@@ -149,6 +154,7 @@ class Port():
                                           ("speed", speed_str),
                                           ("index", index_str)])
         self._cfg_db_ptbl.set(self.get_name(), fvs)
+        time.sleep(1)
 
     def get_fvs_dict(self, fvs):
         fvs_dict = {}
@@ -165,9 +171,7 @@ class Port():
         return status
 
     def sync_oid(self):
-        if self._oid is None:
-            counter_redis_conn = redis.Redis(unix_socket_path=self._dvs.redis_sock, db=swsscommon.COUNTERS_DB)
-            self._oid = counter_redis_conn.hget("COUNTERS_PORT_NAME_MAP", self.get_name())
+        self._oid = self._counters_db.hget("COUNTERS_PORT_NAME_MAP", self.get_name())
 
     def exists_in_asic_db(self):
         self.sync_oid()
@@ -242,23 +246,7 @@ class DPB():
         p.verify_asic_db()
         #print "ASIC DB verification passed!"
 
-    def breakout(self, dvs, port_name, num_child_ports):
-
-        p = Port(dvs, port_name)
-        p.sync_from_config_db()
-
-        # Delete port from config DB and kernel
-        p.delete_from_config_db()
-        # TBD, need vs lib to support hostif removal
-        #dvs.runcmd("ip link delete " + p.get_name())
-        #print "Deleted port:%s from config DB"%port_name
-        time.sleep(6)
-
-        # Verify port is deleted from all DBs
-        assert(p.exists_in_config_db() == False)
-        assert(p.exists_in_app_db() == False)
-        assert(p.exists_in_asic_db() == False)
-
+    def create_child_ports(self, dvs, p, num_child_ports):
         # Create child ports and write to config DB
         child_ports = p.port_split(num_child_ports)
         child_port_names = []
@@ -280,6 +268,26 @@ class DPB():
             assert(cp.exists_in_asic_db() == True)
             cp.verify_asic_db()
         #print "ASIC DB verification passed"
+
+    def breakout(self, dvs, port_name, num_child_ports):
+
+        p = Port(dvs, port_name)
+        p.sync_from_config_db()
+
+        # Delete port from config DB and kernel
+        p.delete_from_config_db()
+        # TBD, need vs lib to support hostif removal
+        #dvs.runcmd("ip link delete " + p.get_name())
+        #print "Deleted port:%s from config DB"%port_name
+        time.sleep(6)
+
+        # Verify port is deleted from all DBs
+        assert(p.exists_in_config_db() == False)
+        assert(p.exists_in_app_db() == False)
+        assert(p.exists_in_asic_db() == False)
+        
+        self.create_child_ports(dvs, p, num_child_ports)
+
 
     def change_speed_and_verify(self, dvs, port_names, speed = 100000):
         for port_name  in port_names:
