@@ -14,6 +14,44 @@ class TestPortDPBAcl(object):
     '''
     @pytest.mark.skip()
     '''
+    def test_acl_table_empty_port_list(self, dvs):
+        dvs.setup_db()
+
+        # Create ACL table "test" and bind it to Ethernet0
+        bind_ports = []
+        dvs.create_acl_table("test", "L3", bind_ports)
+        time.sleep(2)
+        acl_table_ids = dvs.get_acl_table_ids()
+        assert len(acl_table_ids) == 1
+        dvs.verify_acl_group_num(0)
+        acl_group_ids = dvs.get_acl_group_ids()
+        assert len(acl_group_ids) == 0 
+
+        bind_ports = ["Ethernet0"]
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
+        time.sleep(2)
+        acl_table_ids = dvs.get_acl_table_ids()
+        assert len(acl_table_ids) == 1
+        dvs.verify_acl_group_num(1)
+        acl_group_ids = dvs.get_acl_group_ids()
+        assert len(acl_group_ids) == 1 
+        dvs.verify_acl_group_member(acl_group_ids[0], acl_table_ids[0])
+        dvs.verify_acl_port_binding(bind_ports)
+
+        bind_ports = []
+        fvs = swsscommon.FieldValuePairs([("ports", ",".join(bind_ports))])
+        dvs.update_acl_table("test", fvs)
+        time.sleep(2)
+        acl_table_ids = dvs.get_acl_table_ids()
+        assert len(acl_table_ids) == 1
+        dvs.verify_acl_group_num(0)
+        acl_group_ids = dvs.get_acl_group_ids()
+        assert len(acl_group_ids) == 0 
+
+    '''
+    @pytest.mark.skip()
+    '''
     def test_one_port_two_acl_tables(self, dvs):
         dvs.setup_db()
 

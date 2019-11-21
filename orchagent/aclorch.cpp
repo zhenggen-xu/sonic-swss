@@ -1217,9 +1217,6 @@ bool AclTable::validate()
     if (type == ACL_TABLE_UNKNOWN || stage == ACL_STAGE_UNKNOWN)
         return false;
 
-    if (portSet.empty() && pendingPortSet.empty())
-        return false;
-
     return true;
 }
 
@@ -2550,7 +2547,10 @@ bool AclOrch::updateAclTablePorts(AclTable &newTable, AclTable &curTable)
             continue;
         }
 
-        assert(gPortsOrch->getAclBindPortId(p, port_oid));
+        if (!gPortsOrch->getAclBindPortId(p, port_oid))
+        {
+            throw runtime_error("updateAclTablePorts: Couldn't find portOID");
+        }
 
         curTable.portSet.emplace(p);
 
@@ -3043,7 +3043,7 @@ bool AclOrch::processAclTablePorts(string portList, AclTable &aclTable)
         {
             SWSS_LOG_ERROR("Failed to get port %s bind port ID for ACL table %s",
                     alias.c_str(), aclTable.id.c_str());
-            assert(0);
+            return false; 
         }
 
         aclTable.link(bind_port_id);

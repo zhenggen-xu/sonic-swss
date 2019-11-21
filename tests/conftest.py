@@ -817,6 +817,7 @@ class DockerVirtualSwitch(object):
         time.sleep(1)
 
     def update_acl_table(self, table, fvs):
+        tbl = swsscommon.Table(self.cdb, "ACL_TABLE")
         tbl.set(table, fvs)
         time.sleep(1) 
 

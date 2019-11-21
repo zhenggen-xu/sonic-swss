@@ -49,11 +49,11 @@ public:
     } ;
 
     enum Dependency {
-	    ACL_DEP,
-	    FDB_DEP,
-	    INTF_DEP,
+            ACL_DEP,
+            FDB_DEP,
+            INTF_DEP,
             LAG_DEP,
-	    VLAN_DEP
+            VLAN_DEP
     };
 
     Port() {};
