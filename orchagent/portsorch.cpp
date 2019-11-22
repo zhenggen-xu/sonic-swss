@@ -2145,6 +2145,7 @@ void PortsOrch::doPortTask(Consumer &consumer)
             {
                 // Port has one or more dependencies, cannot remove
                 SWSS_LOG_WARN("Cannot to remove port because of dependency"); 
+                it++;
                 continue;
             }
 
