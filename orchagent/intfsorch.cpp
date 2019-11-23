@@ -30,6 +30,7 @@ extern PortsOrch *gPortsOrch;
 extern RouteOrch *gRouteOrch;
 extern CrmOrch *gCrmOrch;
 extern BufferOrch *gBufferOrch;
+extern bool gIsNatSupported;
 
 const int intfsorch_pri = 35;
 
@@ -76,8 +77,6 @@ IntfsOrch::IntfsOrch(DBConnector *db, string tableName, VRFOrch *vrf_orch) :
     fieldValues.emplace_back(POLL_INTERVAL_FIELD, RIF_FLEX_STAT_COUNTER_POLL_MSECS);
     fieldValues.emplace_back(STATS_MODE_FIELD, STATS_MODE_READ);
     m_flexCounterGroupTable->set(RIF_STAT_COUNTER_FLEX_COUNTER_GROUP, fieldValues);
- 
-    getNatSupportedInfo();
 }
 
 sai_object_id_t IntfsOrch::getRouterIntfsId(const string &alias)
@@ -603,7 +602,7 @@ void IntfsOrch::doTask(Consumer &consumer)
                         (nat_zone_id != m_nat_zone[alias]))
                     {
                         m_nat_zone[alias] = nat_zone_id;
-                        if (isNatSupported)
+                        if (gIsNatSupported)
                         {
                             setRouterIntfsNatZoneId(port, nat_zone_id);
                         }
@@ -798,17 +797,11 @@ bool IntfsOrch::addRouterIntfs(sai_object_id_t vrf_id, Port &port)
     attr.value.u32 = port.m_mtu;
     attrs.push_back(attr);
 
-    if (isNatSupported)
+    if ((gIsNatSupported) and (m_nat_zone.find(port.m_alias) != m_nat_zone.end()))
     {
         attr.id = SAI_ROUTER_INTERFACE_ATTR_NAT_ZONE_ID;
-        if (m_nat_zone.find(port.m_alias) == m_nat_zone.end())
-        {
-            attr.value.u32 = DEFAULT_NAT_ZONE_ID;
-        }
-        else
-        {
-            attr.value.u32 = m_nat_zone[port.m_alias];
-        }
+        attr.value.u32 = m_nat_zone[port.m_alias];
+
         SWSS_LOG_INFO("Assinging NAT zone id %d to interface %s\n", attr.value.u32, port.m_alias.c_str());
         attrs.push_back(attr);
     }
@@ -1086,33 +1079,6 @@ void IntfsOrch::doTask(SelectableTimer &timer)
         else
         {
             ++it;
-        }
-    }
-}
-
-void IntfsOrch::getNatSupportedInfo()
-{
-    SWSS_LOG_ENTER();
-
-    sai_status_t     status;
-    sai_attribute_t  attr;
-
-    SWSS_LOG_INFO("Verify NAT is supported or not");
-
-    memset(&attr, 0, sizeof(attr));
-    attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
-    isNatSupported = false;
-
-    status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_NOTICE("Failed to get the SNAT available entry count, rv:%d", status);
-    }
-    else
-    {
-        if (attr.value.u32 != 0)
-        {
-            isNatSupported = true;
         }
     }
 }

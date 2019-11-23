@@ -50,7 +50,6 @@ public:
 protected:
     object_map m_trap_group_map;
     bool       enable_sflow_trap;
-    bool       isNatSupported;
 
     TrapGroupPolicerTable m_trap_group_policer_map;
     TrapIdTrapObjectsTable m_syncdTrapIds;
@@ -61,7 +60,6 @@ protected:
     void initDefaultHostIntfTable();
     void initDefaultTrapGroup();
     void initDefaultTrapIds();
-    void getNatSupportedInfo();
 
     task_process_status processCoppRule(Consumer& consumer);
     bool isValidList(std::vector<std::string> &trap_id_list, std::vector<std::string> &all_items) const;

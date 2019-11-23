@@ -33,6 +33,7 @@ extern sai_switch_api_t   *sai_switch_api;
 extern sai_object_id_t     gVirtualRouterId;
 extern sai_nat_api_t      *sai_nat_api;
 extern sai_hostif_api_t   *sai_hostif_api;
+extern bool               gIsNatSupported;
 #ifdef DEBUG_FRAMEWORK
 extern DebugDumpOrch      *gDebugDumpOrch;
 #endif
@@ -2333,7 +2334,7 @@ void NatOrch::enableNatFeature(void)
 
     SWSS_LOG_INFO("Verify NAT is supported or not");
 
-    if (maxAllowedSNatEntries == 0)
+    if (gIsNatSupported == false)
     {
         SWSS_LOG_NOTICE("NAT Feature is not supported in this Platform");
         return;
@@ -2341,7 +2342,7 @@ void NatOrch::enableNatFeature(void)
     else
     {
         admin_mode = "enabled";
-        SWSS_LOG_INFO("NAT Feature is supported with available limit : %d", attr.value.u32);
+        SWSS_LOG_INFO("NAT Feature is supported with available limit : %d", maxAllowedSNatEntries);
     }
 
     SWSS_LOG_INFO("Enabling NAT ");

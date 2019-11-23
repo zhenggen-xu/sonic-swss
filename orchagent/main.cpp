@@ -48,6 +48,7 @@ bool gSairedisRecord = true;
 bool gSwssRecord = true;
 bool gLogRotate = false;
 bool gSyncMode = false;
+bool gIsNatSupported = false;
 
 ofstream gRecordOfs;
 string gRecordFile;
@@ -268,6 +269,22 @@ int main(int argc, char **argv)
 
     gVirtualRouterId = attr.value.oid;
     SWSS_LOG_NOTICE("Get switch virtual router ID %" PRIx64, gVirtualRouterId);
+
+    /* Get the NAT supported info */
+    attr.id = SAI_SWITCH_ATTR_AVAILABLE_SNAT_ENTRY;
+
+    status = sai_switch_api->get_switch_attribute(gSwitchId, 1, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_NOTICE("Failed to get the SNAT available entry count, rv:%d", status);
+    }
+    else
+    {
+        if (attr.value.u32 != 0)
+        {
+            gIsNatSupported = true;
+        }
+    }
 
     /* Create a loopback underlay router interface */
     vector<sai_attribute_t> underlay_intf_attrs;
