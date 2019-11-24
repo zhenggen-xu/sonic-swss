@@ -48,7 +48,8 @@ bool gSairedisRecord = true;
 bool gSwssRecord = true;
 bool gLogRotate = false;
 bool gSyncMode = false;
-bool gIsNatSupported = false;
+
+extern bool gIsNatSupported;
 
 ofstream gRecordOfs;
 string gRecordFile;

@@ -36,6 +36,8 @@ SwitchOrch *gSwitchOrch;
 Directory<Orch*> gDirectory;
 NatOrch *gNatOrch;
 
+bool gIsNatSupported = false;
+
 OrchDaemon::OrchDaemon(DBConnector *applDb, DBConnector *configDb, DBConnector *stateDb) :
         m_applDb(applDb),
         m_configDb(configDb),
