@@ -167,6 +167,35 @@ bool IntfsOrch::setRouterIntfsMtu(const Port &port)
     return true;
 }
 
+bool IntfsOrch::setRouterIntfsNatZoneId(Port &port)
+{
+    SWSS_LOG_ENTER();
+
+    /* Return true if the router interface is not exists */
+    if (!port.m_rif_id)
+    {
+        SWSS_LOG_WARN("Router interface is not exists on %s",
+                      port.m_alias.c_str());
+        return true;
+    }
+
+    sai_attribute_t attr;
+    attr.id = SAI_ROUTER_INTERFACE_ATTR_NAT_ZONE_ID;
+    attr.value.u32 = port.m_nat_zone_id;
+
+    sai_status_t status = sai_router_intfs_api->
+            set_router_interface_attribute(port.m_rif_id, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+         SWSS_LOG_ERROR("Failed to set router interface %s NAT Zone Id to %u, rv:%d",
+                port.m_alias.c_str(), port.m_nat_zone_id, status);
+        return false;
+    }
+    SWSS_LOG_NOTICE("Set router interface %s NAT Zone Id to %u",
+            port.m_alias.c_str(), port.m_nat_zone_id);
+    return true;
+}
+
 bool IntfsOrch::setRouterIntfsAdminStatus(const Port &port)
 {
     SWSS_LOG_ENTER();
@@ -193,36 +222,6 @@ bool IntfsOrch::setRouterIntfsAdminStatus(const Port &port)
                 port.m_alias.c_str(), port.m_admin_state_up == true ? "up" : "down", status);
         return false;
     }
-
-    return true;
-}
-
-bool IntfsOrch::setRouterIntfsNatZoneId(Port &port, uint32_t &nat_zone_id)
-{
-    SWSS_LOG_ENTER();
-
-    /* Return true if the router interface is not exists */
-    if (!port.m_rif_id)
-    {
-        SWSS_LOG_WARN("Router interface is not exists on %s",
-                      port.m_alias.c_str());
-        return true;
-    }
-
-    sai_attribute_t attr;
-    attr.id = SAI_ROUTER_INTERFACE_ATTR_NAT_ZONE_ID;
-    attr.value.u32 = nat_zone_id;
-
-    sai_status_t status = sai_router_intfs_api->
-            set_router_interface_attribute(port.m_rif_id, &attr);
-    if (status != SAI_STATUS_SUCCESS)
-    {
-        SWSS_LOG_ERROR("Failed to set router interface %s NAT Zone Id to %u, rv:%d",
-                port.m_alias.c_str(), nat_zone_id, status);
-        return false;
-    }
-    SWSS_LOG_NOTICE("Set router interface %s NAT Zone Id to %u",
-            port.m_alias.c_str(), nat_zone_id);
 
     return true;
 }
@@ -453,6 +452,19 @@ void IntfsOrch::doTask(Consumer &consumer)
             {
                 vnet_name = value;
             }
+            else if (field == "nat_zone")
+            {
+                try
+                {
+                    nat_zone_id = (uint32_t)stoul(value);
+                }
+                catch (...)
+                {
+                    SWSS_LOG_ERROR("Invalid argument %s for nat zone", value.c_str());
+                    continue;
+                }
+                nat_zone = value;
+            }
             else if (field == "mtu")
             {
                 try
@@ -595,18 +607,20 @@ void IntfsOrch::doTask(Consumer &consumer)
                 }
 
                 /* Set nat zone id */
-                if (!nat_zone.empty())
+                if ((!nat_zone.empty()) and (port.m_nat_zone_id != nat_zone_id))
                 {
-                    nat_zone_id = (uint32_t)stoul(nat_zone);
-                    if ((m_nat_zone.find(alias) == m_nat_zone.end()) or
-                        (nat_zone_id != m_nat_zone[alias]))
+                    port.m_nat_zone_id = nat_zone_id;
+
+                    if (gIsNatSupported)
                     {
-                        m_nat_zone[alias] = nat_zone_id;
-                        if (gIsNatSupported)
-                        {
-                            setRouterIntfsNatZoneId(port, nat_zone_id);
-                        }
+                        setRouterIntfsNatZoneId(port);
                     }
+                    else
+                    {
+                        SWSS_LOG_NOTICE("Not set router interface %s NAT Zone Id to %u, as NAT is not supported",
+                                        port.m_alias.c_str(), port.m_nat_zone_id);
+                    }
+                    gPortsOrch->setPort(alias, port);
                 }
             }
 
@@ -666,11 +680,6 @@ void IntfsOrch::doTask(Consumer &consumer)
             if (m_vnetInfses.find(alias) != m_vnetInfses.end())
             {
                 vnet_name = m_vnetInfses.at(alias);
-            }
-
-            if (!ip_prefix_in_key)
-            {
-                m_nat_zone.erase(alias);
             }
 
             if (!vnet_name.empty())
@@ -797,10 +806,10 @@ bool IntfsOrch::addRouterIntfs(sai_object_id_t vrf_id, Port &port)
     attr.value.u32 = port.m_mtu;
     attrs.push_back(attr);
 
-    if ((gIsNatSupported) and (m_nat_zone.find(port.m_alias) != m_nat_zone.end()))
+    if (gIsNatSupported)
     {
         attr.id = SAI_ROUTER_INTERFACE_ATTR_NAT_ZONE_ID;
-        attr.value.u32 = m_nat_zone[port.m_alias];
+        attr.value.u32 = port.m_nat_zone_id;
 
         SWSS_LOG_INFO("Assinging NAT zone id %d to interface %s\n", attr.value.u32, port.m_alias.c_str());
         attrs.push_back(attr);
@@ -846,6 +855,7 @@ bool IntfsOrch::removeRouterIntfs(Port &port)
 
     port.m_rif_id = 0;
     port.m_vr_id = 0;
+    port.m_nat_zone_id = 0;
     gPortsOrch->setPort(port.m_alias, port);
 
     SWSS_LOG_NOTICE("Remove router interface for port %s", port.m_alias.c_str());
