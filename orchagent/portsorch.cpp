@@ -2355,7 +2355,7 @@ void PortsOrch::doVlanMemberTask(Consumer &consumer)
             }
             else
             {
-                it++; //continue?
+                it++;
             }
         }
         else if (op == DEL_COMMAND)
@@ -2387,6 +2387,7 @@ void PortsOrch::doVlanMemberTask(Consumer &consumer)
             it = consumer.m_toSync.erase(it);
         }
     }
+    
 }
 
 void PortsOrch::doLagTask(Consumer &consumer)

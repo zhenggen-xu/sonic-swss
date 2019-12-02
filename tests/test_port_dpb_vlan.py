@@ -112,7 +112,9 @@ class TestPortDPBVlan(object):
 
         dvs.remove_vlan("100")
 
+    '''    
     @pytest.mark.skip()
+    '''
     def test_one_port_multiple_vlan(self, dvs):
         dpb = DPB()
         dvs.setup_db()

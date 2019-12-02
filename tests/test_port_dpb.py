@@ -74,7 +74,9 @@ class TestPortDPB(object):
         dpb.breakin(dvs, ["Ethernet64", "Ethernet65", "Ethernet66", "Ethernet67"])
         dpb.breakin(dvs, ["Ethernet112", "Ethernet113", "Ethernet114", "Ethernet115"])
 
+    '''
     @pytest.mark.skip()
+    '''
     def test_port_breakout_all(self, dvs):
         dpb = DPB()
         port_names = []
