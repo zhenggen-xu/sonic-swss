@@ -694,6 +694,11 @@ class DockerVirtualSwitch(object):
 
         return exists, extra_info
 
+    def delete_port(self, port):
+        tbl = swsscommon.Table(self.cdb, "PORT")
+        tbl._del(port)
+        time.sleep(1)
+        
     def create_vlan(self, vlan):
         tbl = swsscommon.Table(self.cdb, "VLAN")
         fvs = swsscommon.FieldValuePairs([("vlanid", vlan)])
