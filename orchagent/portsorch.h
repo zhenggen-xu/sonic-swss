@@ -105,6 +105,9 @@ public:
 
     bool addSubPort(Port &port, const string &alias, const bool &adminUp = true, const uint32_t &mtu = 0);
     bool removeSubPort(const string &alias);
+
+    void increasePortNeighRefCount(const string &alias);
+    void decreasePortNeighRefCount(const string &alias);
 private:
     unique_ptr<Table> m_counterTable;
     unique_ptr<Table> m_portTable;

@@ -3918,3 +3918,29 @@ void PortsOrch::getPortSerdesVal(const std::string& val_str,
         lane_values.push_back(lane_val);
     }
 }
+
+void PortsOrch::increasePortNeighRefCount(const string &alias)
+{
+    Port p;
+    getPort(alias, p);
+    p.m_neigh_ref_count ++;
+    SWSS_LOG_NOTICE("Increase Port %s neigh ref count to: %d", p.m_alias.c_str(), p.m_neigh_ref_count);
+    p.set_dependency(Port::NEIGH_DEP);
+    setPort(alias, p);
+}
+
+void PortsOrch::decreasePortNeighRefCount(const string &alias)
+{
+    Port p;
+    getPort(alias, p);
+    if (p.m_neigh_ref_count > 0)
+        p.m_neigh_ref_count --;
+
+    SWSS_LOG_NOTICE("Decrease Port %s neigh ref count to: %d", p.m_alias.c_str(), p.m_neigh_ref_count);
+
+    if (p.m_neigh_ref_count == 0) {
+        SWSS_LOG_NOTICE("Port %s neigh ref count %d: clear dependency", p.m_alias.c_str(), p.m_neigh_ref_count);
+        p.clear_dependency(Port::NEIGH_DEP);
+    }
+    setPort(alias, p);
+}

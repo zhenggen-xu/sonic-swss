@@ -55,6 +55,7 @@ public:
             INTF_DEP,
             LAG_DEP,
             VLAN_DEP,
+            NEIGH_DEP,
             MAX_DEP
     };
     std::unordered_map<Dependency, std::string> 
@@ -108,6 +109,8 @@ public:
     vlan_members_t      m_vlan_members;
     uint32_t            m_dependency_bitmap = 0;
     sai_object_id_t     m_parent_port_id = 0;
+    uint32_t            m_neigh_ref_count = 0;
+
     sai_port_oper_status_t m_oper_status = SAI_PORT_OPER_STATUS_UNKNOWN;
     std::set<std::string> m_members;
     std::set<std::string> m_child_ports;

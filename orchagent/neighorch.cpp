@@ -348,8 +348,10 @@ void NeighOrch::doTask(Consumer &consumer)
 
             if (m_syncdNeighbors.find(neighbor_entry) == m_syncdNeighbors.end() || m_syncdNeighbors[neighbor_entry] != mac_address)
             {
-                if (addNeighbor(neighbor_entry, mac_address))
+                if (addNeighbor(neighbor_entry, mac_address)) {
+                    gPortsOrch->increasePortNeighRefCount(p.m_alias);
                     it = consumer.m_toSync.erase(it);
+                }
                 else
                     it++;
             }
@@ -363,6 +365,7 @@ void NeighOrch::doTask(Consumer &consumer)
             {
                 if (removeNeighbor(neighbor_entry))
                 {
+                    gPortsOrch->decreasePortNeighRefCount(p.m_alias);
                     it = consumer.m_toSync.erase(it);
                 }
                 else

@@ -941,6 +941,21 @@ class DockerVirtualSwitch(object):
         acl_table_groups = atbl.getKeys()
         assert len(acl_table_groups) == len(bind_ports)
 
+    def create_l3_intf(self, interface, vrf_name):
+        tbl = swsscommon.Table(self.cdb, "INTERFACE")
+        if len(vrf_name) == 0:
+            fvs = swsscommon.FieldValuePairs([("NULL", "NULL")])
+        else:
+            fvs = swsscommon.FieldValuePairs([("vrf_name", vrf_name)])
+        tbl.set(interface, fvs)
+        time.sleep(1)
+
+    def create_route_entry(self, key, pairs):
+        tbl = swsscommon.ProducerStateTable(self.pdb, "ROUTE_TABLE")
+        fvs = swsscommon.FieldValuePairs(pairs)
+        tbl.set(key, fvs)
+        time.sleep(1)
+
 @pytest.yield_fixture(scope="module")
 def dvs(request):
     name = request.config.getoption("--dvsname")
