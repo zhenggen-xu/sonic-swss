@@ -2590,7 +2590,7 @@ void PortsOrch::doLagTask(Consumer &consumer)
                         if (getPort(alias, lag))
                         {
                             SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
-                                "as it is DOWN", alias.c_str(), lag.m_bridge_port_id);
+                                " as it is DOWN", alias.c_str(), lag.m_bridge_port_id);
                             flushFDBEntries(lag.m_bridge_port_id);
                         }
                     }
@@ -3745,7 +3745,7 @@ void PortsOrch::doTask(NotificationConsumer &consumer)
             if (status == SAI_PORT_OPER_STATUS_DOWN)
             {
                 SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
-                    "as it is DOWN", port.m_alias.c_str(), port.m_bridge_port_id);
+                    " as it is DOWN", port.m_alias.c_str(), port.m_bridge_port_id);
                 flushFDBEntries(port.m_bridge_port_id);
             }
 
@@ -3949,6 +3949,6 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
 
     if (rv != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_WARN("Flush fdb by bridge port id: %" PRIx64 "failed: %d", bridge_port_id, rv);
+        SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 "failed: %d", bridge_port_id, rv);
     }
 }
