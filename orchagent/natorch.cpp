@@ -38,6 +38,7 @@ extern bool               gIsNatSupported;
 extern DebugDumpOrch      *gDebugDumpOrch;
 #endif
 uint32_t  natTimerTickCntr  = 0;
+bool      gNhTrackingSupported = false;
 
 NatOrch::NatOrch(DBConnector *appDb, DBConnector *stateDb, vector<table_name_with_pri_t> &tableNames,
          RouteOrch *routeOrch, NeighOrch *neighOrch):
@@ -76,7 +77,7 @@ NatOrch::NatOrch(DBConnector *appDb, DBConnector *stateDb, vector<table_name_wit
     totalStaticNaptEntries = totalDynamicNaptEntries = 0;
     totalStaticTwiceNatEntries = totalDynamicTwiceNatEntries = 0;
     totalStaticTwiceNaptEntries = totalDynamicTwiceNaptEntries = 0;
- 
+
     /* Add NAT notifications support from APPL_DB */
     SWSS_LOG_INFO("Add NAT notifications support from APPL_DB ");
     m_flushNotificationsConsumer = new NotificationConsumer(appDb, "FLUSHNATREQUEST");
@@ -131,6 +132,13 @@ NatOrch::NatOrch(DBConnector *appDb, DBConnector *stateDb, vector<table_name_wit
     this->m_dbgCompName = "natorch";
     gDebugDumpOrch->addDbgCompMap(m_dbgCompName, this);
 #endif
+
+    char *platform = getenv("platform");
+    if (platform && strstr(platform, BRCM_PLATFORM_SUBSTRING))
+    {
+        gNhTrackingSupported = true; 
+    }
+    SWSS_LOG_NOTICE("DNAT nexthop tracking is %s", ((gNhTrackingSupported == true) ? "enabled" : "disabled"));
 }
 
 /* Process notifications for changes in Neighbor entries and route entries
@@ -1776,8 +1784,16 @@ bool NatOrch::addNatEntry(const IpAddress &ip_address, const NatEntryValue &entr
     }
     else if (entry.nat_type == "dnat")
     {
-        /* Cache the DNAT entry in the nexthop resolution cache */
-        addDnatToNhCache(entry.translated_ip, ip_address);
+        if (gNhTrackingSupported == true)
+        {
+            /* Cache the DNAT entry in the nexthop resolution cache */
+            addDnatToNhCache(entry.translated_ip, ip_address);
+        }
+        else
+        {
+            /* Add DNAT entry to the hardware */
+            addHwDnatEntry(ip_address);
+        }
     }
 
     return true;
@@ -1804,7 +1820,16 @@ bool NatOrch::removeNatEntry(const IpAddress &ip_address)
     }
     else if (entry.nat_type == "dnat")
     {
-        removeDnatFromNhCache(entry.translated_ip, ip_address);
+        if (gNhTrackingSupported == true)
+        {
+            /* Cache the DNAT entry in the nexthop resolution cache */
+            removeDnatFromNhCache(entry.translated_ip, ip_address);
+        }
+        else
+        {
+            removeHwDnatEntry(ip_address);
+            m_natEntries.erase(ip_address);
+        }
     }
     else
     {
@@ -1853,8 +1878,16 @@ bool NatOrch::addTwiceNatEntry(const TwiceNatEntryKey &key, const TwiceNatEntryV
         return true;
     }
 
-    /* Cache the Twice NAT entry in the nexthop resolution cache */
-    addTwiceNatToNhCache(value.translated_dst_ip, key);
+    if (gNhTrackingSupported == true)
+    {
+        /* Cache the Twice NAT entry in the nexthop resolution cache */
+        addTwiceNatToNhCache(value.translated_dst_ip, key);
+    }
+    else
+    {
+        /* Add Twice NAT entry to the hardware */
+        addHwTwiceNatEntry(key);
+    }
 
     return true;
 }
@@ -1873,7 +1906,15 @@ bool NatOrch::removeTwiceNatEntry(const TwiceNatEntryKey &key)
 
     TwiceNatEntryValue value = m_twiceNatEntries[key];
 
-    removeTwiceNatFromNhCache(value.translated_dst_ip, key);
+    if (gNhTrackingSupported == true)
+    {
+        removeTwiceNatFromNhCache(value.translated_dst_ip, key);
+    }
+    else
+    {
+        removeHwTwiceNatEntry(key);
+        m_twiceNatEntries.erase(key);
+    }
 
     return true;
 }
@@ -1973,7 +2014,16 @@ bool NatOrch::addNaptEntry(const NaptEntryKey &keyEntry, const NaptEntryValue &e
     }
     else if (entry.nat_type == "dnat")
     {
-        addDnaptToNhCache(entry.translated_ip, keyEntry);
+        if (gNhTrackingSupported == true)
+        {
+            /* Cache the DNAPT entry in the nexthop resolution cache */
+            addDnaptToNhCache(entry.translated_ip, keyEntry);
+        }
+        else
+        {
+            /* Add DNAPT entry in the hardware */
+            addHwDnaptEntry(keyEntry);
+        }
     }
     else
     {
@@ -2008,7 +2058,15 @@ bool NatOrch::removeNaptEntry(const NaptEntryKey &keyEntry)
     }
     else if (entry.nat_type == "dnat")
     {
-        removeDnaptFromNhCache(entry.translated_ip, keyEntry);
+        if (gNhTrackingSupported == true)
+        {
+            removeDnaptFromNhCache(entry.translated_ip, keyEntry);
+        }
+        else
+        {
+            removeHwDnaptEntry(keyEntry);
+            m_naptEntries.erase(keyEntry);
+        }
     }
     else
     {
@@ -2105,8 +2163,16 @@ bool NatOrch::addTwiceNaptEntry(const TwiceNaptEntryKey &key, const TwiceNaptEnt
         return true;
     }
 
-    /* Add Twice NAPT entry to the NH resolv cache */
-    addTwiceNaptToNhCache(value.translated_dst_ip, key);
+    if (gNhTrackingSupported == true)
+    {
+        /* Add Twice NAPT entry to the NH resolv cache */
+        addTwiceNaptToNhCache(value.translated_dst_ip, key);
+    }
+    else
+    {
+        /* Add Twice NAPT entry to the hardware */
+        addHwTwiceNaptEntry(key);
+    }
 
     return true;
 }
@@ -2125,8 +2191,16 @@ bool NatOrch::removeTwiceNaptEntry(const TwiceNaptEntryKey &key)
 
     TwiceNaptEntryValue value = m_twiceNaptEntries[key];
 
-    /* Remove Twice NAPT entry from the NH resolv cache */
-    removeTwiceNaptFromNhCache(value.translated_dst_ip, key);
+    if (gNhTrackingSupported == true)
+    {
+        /* Remove Twice NAPT entry from the NH resolv cache */
+        removeTwiceNaptFromNhCache(value.translated_dst_ip, key);
+    }
+    else
+    {
+        removeHwTwiceNaptEntry(key);
+        m_twiceNaptEntries.erase(key);
+    }
 
     return true;
 }
@@ -2179,7 +2253,15 @@ void NatOrch::clearAllDnatEntries(void)
         {
             if (natEntry.nat_type == "dnat")
             {
-                removeDnatFromNhCache(natEntry.translated_ip, dstIp);
+                if (gNhTrackingSupported == true)
+                {
+                    removeDnatFromNhCache(natEntry.translated_ip, dstIp);
+                }
+                else
+                {
+                    removeHwDnatEntry(dstIp);
+                    m_natEntries.erase(dstIp);
+                }
             }
         }
     }
@@ -2195,7 +2277,15 @@ void NatOrch::clearAllDnatEntries(void)
         {
             if (naptEntry.nat_type == "dnat")
             {
-                removeDnaptFromNhCache(naptEntry.translated_ip, keyEntry);
+                if (gNhTrackingSupported == true)
+                {
+                    removeDnaptFromNhCache(naptEntry.translated_ip, keyEntry);
+                }
+                else
+                {
+                    removeHwDnaptEntry(keyEntry);
+                    m_naptEntries.erase(keyEntry);
+                }
             }
         }
     }
@@ -2209,7 +2299,15 @@ void NatOrch::clearAllDnatEntries(void)
 
         if (twiceNatValue.addedToHw == true)
         {
-            removeTwiceNatFromNhCache(twiceNatValue.translated_dst_ip, twiceNatKey);
+            if (gNhTrackingSupported == true)
+            {
+                removeTwiceNatFromNhCache(twiceNatValue.translated_dst_ip, twiceNatKey);
+            }
+            else
+            {
+                removeHwTwiceNatEntry(twiceNatKey);
+                m_twiceNatEntries.erase(twiceNatKey);
+            }
         }
     }
 
@@ -2222,7 +2320,15 @@ void NatOrch::clearAllDnatEntries(void)
 
         if (twiceNaptValue.addedToHw == true)
         {
-            removeTwiceNaptFromNhCache(twiceNaptValue.translated_dst_ip, twiceNaptKey);
+            if (gNhTrackingSupported == true)
+            {
+                removeTwiceNaptFromNhCache(twiceNaptValue.translated_dst_ip, twiceNaptKey);
+            }
+            else
+            {
+                removeHwTwiceNaptEntry(twiceNaptKey);
+                m_twiceNaptEntries.erase(twiceNaptKey);
+            } 
         }
     }
 }
@@ -2360,9 +2466,11 @@ void NatOrch::enableNatFeature(void)
     SWSS_LOG_INFO("NAT Query timer start ");
     m_natQueryTimer->start();
 
-    SWSS_LOG_INFO("Attach to Neighbor Orch ");
-    m_neighOrch->attach(this);
-
+    if (gNhTrackingSupported == true)
+    {
+        SWSS_LOG_INFO("Attach to Neighbor Orch ");
+        m_neighOrch->attach(this);
+    }
     if (! warmBootingInProgress())
     {
         SWSS_LOG_NOTICE("Not warm rebooting, so clearing all conntrack Entries on nat feature enable");
@@ -2402,8 +2510,11 @@ void NatOrch::disableNatFeature(void)
     SWSS_LOG_INFO("NAT Query timer stop ");
     m_natQueryTimer->stop();
 
-    SWSS_LOG_INFO("Detach to Neighbor Orch ");
-    m_neighOrch->detach(this);
+    if (gNhTrackingSupported == true)
+    {
+        SWSS_LOG_INFO("Detach to Neighbor Orch ");
+        m_neighOrch->detach(this);
+    }
 
     SWSS_LOG_INFO("Clear all dynamic NAT Entries ");
     flushAllNatEntries();
@@ -2912,7 +3023,14 @@ void NatOrch::addAllNatEntries(void)
             }
             else if ((*natIter).second.nat_type == "dnat")
             {
-                addDnatToNhCache((*natIter).second.translated_ip, (*natIter).first);
+                if (gNhTrackingSupported == true)
+                {
+                    addDnatToNhCache((*natIter).second.translated_ip, (*natIter).first);
+                }
+                else
+                {
+                    addHwDnatEntry((*natIter).first);
+                }
             }
         }
         natIter++;
@@ -2930,10 +3048,55 @@ void NatOrch::addAllNatEntries(void)
             }
             else if ((*naptIter).second.nat_type == "dnat")
             {
-                addDnaptToNhCache((*naptIter).second.translated_ip, (*naptIter).first);
+                if (gNhTrackingSupported == true)
+                {
+                    addDnaptToNhCache((*naptIter).second.translated_ip, (*naptIter).first);
+                }
+                else
+                {
+                    addHwDnaptEntry((*naptIter).first);
+                }
             }
         }
         naptIter++;
+    }
+
+    TwiceNatEntry::iterator twiceNatIter = m_twiceNatEntries.begin();
+    while (twiceNatIter != m_twiceNatEntries.end())
+    {
+        if ((*twiceNatIter).second.addedToHw == false)
+        {
+            if (gNhTrackingSupported == true)
+            {
+                /* Cache the Twice NAT entry in the nexthop resolution cache */
+                addTwiceNatToNhCache((*twiceNatIter).second.translated_dst_ip, (*twiceNatIter).first);
+            }
+            else
+            {
+                /* Add Twice NAT entry to the hardware */
+                addHwTwiceNatEntry((*twiceNatIter).first);
+            }
+        }
+        twiceNatIter++;
+    }
+
+    TwiceNaptEntry::iterator twiceNaptIter = m_twiceNaptEntries.begin();
+    while (twiceNaptIter != m_twiceNaptEntries.end())
+    {
+        if ((*twiceNaptIter).second.addedToHw == false)
+        {
+            if (gNhTrackingSupported == true)
+            {
+                /* Cache the Twice NAPT entry in the nexthop resolution cache */
+                addTwiceNaptToNhCache((*twiceNaptIter).second.translated_dst_ip, (*twiceNaptIter).first);
+            }
+            else
+            {
+                /* Add Twice NAPT entry to the hardware */
+                addHwTwiceNaptEntry((*twiceNaptIter).first);
+            }
+        }
+        twiceNaptIter++;
     }
 }
 
@@ -4636,57 +4799,60 @@ void NatOrch::debugdumpALL()
     }
     count = 0;
 
-    SWSS_DEBUG_PRINT(m_dbgCompName, "\n\nNatOrch Dump NextHop resolution entries Cache");
-    SWSS_DEBUG_PRINT(m_dbgCompName, "---------------------------------------------");
-
-    auto dnatNhIter = m_nhResolvCache.begin();
-    while (dnatNhIter != m_nhResolvCache.end())
+    if (gNhTrackingSupported == true)
     {
-        ipAddr = dnatNhIter->first;
-        DnatEntries &dnatEntries = dnatNhIter->second; 
-        count++;
-        SWSS_DEBUG_PRINT(m_dbgCompName, "%8d. Translated DNAT IP: %s, neighResolved: %d", count,
-                         ipAddr.to_string().c_str(), dnatEntries.neighResolved);
-        if (dnatEntries.nextHopGroup != NextHopGroupKey())
+        SWSS_DEBUG_PRINT(m_dbgCompName, "\n\nNatOrch Dump NextHop resolution entries Cache");
+        SWSS_DEBUG_PRINT(m_dbgCompName, "---------------------------------------------");
+
+        auto dnatNhIter = m_nhResolvCache.begin();
+        while (dnatNhIter != m_nhResolvCache.end())
         {
-            SWSS_DEBUG_PRINT(m_dbgCompName, "          NextHop Group: %s", dnatEntries.nextHopGroup.to_string().c_str()); 
-        }
-        if (dnatEntries.dnatIp != nullIpv4Addr)
-        {
-            SWSS_DEBUG_PRINT(m_dbgCompName, "             DNAT Entry Key: DIP %s", dnatEntries.dnatIp.to_string().c_str());
-        }
-        if (! dnatEntries.dnapt.empty())
-        {
-            auto iter1 = dnatEntries.dnapt.begin();
-            while (iter1 != dnatEntries.dnapt.end())
+            ipAddr = dnatNhIter->first;
+            DnatEntries &dnatEntries = dnatNhIter->second; 
+            count++;
+            SWSS_DEBUG_PRINT(m_dbgCompName, "%8d. Translated DNAT IP: %s, neighResolved: %d", count,
+                             ipAddr.to_string().c_str(), dnatEntries.neighResolved);
+            if (dnatEntries.nextHopGroup != NextHopGroupKey())
             {
-                SWSS_DEBUG_PRINT(m_dbgCompName, "             DNAPT entry Key: DIP %s, Port %d, Proto %s",
-                                 (*iter1).ip_address.to_string().c_str(), (*iter1).l4_port, (*iter1).prototype.c_str());
-                iter1++;
+                SWSS_DEBUG_PRINT(m_dbgCompName, "          NextHop Group: %s", dnatEntries.nextHopGroup.to_string().c_str()); 
             }
-        }
-        if (! dnatEntries.twiceNat.empty())
-        {
-            auto iter2 = dnatEntries.twiceNat.begin();
-            while (iter2 != dnatEntries.twiceNat.end())
+            if (dnatEntries.dnatIp != nullIpv4Addr)
             {
-                SWSS_DEBUG_PRINT(m_dbgCompName, "             Twice NAT entry key: Src IP: %s, Dst IP: %s",
-                                 (*iter2).src_ip.to_string().c_str(), (*iter2).dst_ip.to_string().c_str());
-                iter2++;
+                SWSS_DEBUG_PRINT(m_dbgCompName, "             DNAT Entry Key: DIP %s", dnatEntries.dnatIp.to_string().c_str());
             }
-        }
-        if (! dnatEntries.twiceNapt.empty())
-        {
-            auto iter3 = dnatEntries.twiceNapt.begin();
-            while (iter3 != dnatEntries.twiceNapt.end())
+            if (! dnatEntries.dnapt.empty())
             {
-                SWSS_DEBUG_PRINT(m_dbgCompName, "             Twice NAPT entry key: Src IP: %s, L4 Port: %d, Dst IP: %s, L4 Port: %d, Proto: %s",
-                                 (*iter3).src_ip.to_string().c_str(), (*iter3).src_l4_port,
-                                 (*iter3).dst_ip.to_string().c_str(), (*iter3).dst_l4_port, (*iter3).prototype.c_str());
-                iter3++;
+                auto iter1 = dnatEntries.dnapt.begin();
+                while (iter1 != dnatEntries.dnapt.end())
+                {
+                    SWSS_DEBUG_PRINT(m_dbgCompName, "             DNAPT entry Key: DIP %s, Port %d, Proto %s",
+                                     (*iter1).ip_address.to_string().c_str(), (*iter1).l4_port, (*iter1).prototype.c_str());
+                    iter1++;
+                }
             }
+            if (! dnatEntries.twiceNat.empty())
+            {
+                auto iter2 = dnatEntries.twiceNat.begin();
+                while (iter2 != dnatEntries.twiceNat.end())
+                {
+                    SWSS_DEBUG_PRINT(m_dbgCompName, "             Twice NAT entry key: Src IP: %s, Dst IP: %s",
+                                     (*iter2).src_ip.to_string().c_str(), (*iter2).dst_ip.to_string().c_str());
+                    iter2++;
+                }
+            }
+            if (! dnatEntries.twiceNapt.empty())
+            {
+                auto iter3 = dnatEntries.twiceNapt.begin();
+                while (iter3 != dnatEntries.twiceNapt.end())
+                {
+                    SWSS_DEBUG_PRINT(m_dbgCompName, "             Twice NAPT entry key: Src IP: %s, L4 Port: %d, Dst IP: %s, L4 Port: %d, Proto: %s",
+                                     (*iter3).src_ip.to_string().c_str(), (*iter3).src_l4_port,
+                                     (*iter3).dst_ip.to_string().c_str(), (*iter3).dst_l4_port, (*iter3).prototype.c_str());
+                    iter3++;
+                }
+            }
+            dnatNhIter++;
         }
-        dnatNhIter++;
     }
 }
 #endif
