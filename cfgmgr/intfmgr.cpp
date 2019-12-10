@@ -390,6 +390,7 @@ bool IntfMgr::doIntfGeneralTask(const vector<string>& keys,
     string vrf_name = "";
     string mtu = "";
     string adminStatus = "";
+    string nat_zone = "";
     for (auto idx : data)
     {
         const auto &field = fvField(idx);

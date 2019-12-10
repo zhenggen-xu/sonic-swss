@@ -191,6 +191,7 @@ bool IntfsOrch::setRouterIntfsAdminStatus(const Port &port)
                 port.m_alias.c_str(), port.m_admin_state_up == true ? "up" : "down", status);
         return false;
     }
+
     return true;
 }
 
@@ -406,7 +407,6 @@ void IntfsOrch::doTask(Consumer &consumer)
         string vrf_name = "", vnet_name = "";
         uint32_t mtu;
         bool adminUp;
-
         for (auto idx : data)
         {
             const auto &field = fvField(idx);
