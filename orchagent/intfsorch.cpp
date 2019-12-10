@@ -435,7 +435,7 @@ void IntfsOrch::doTask(Consumer &consumer)
         }
 
         const vector<FieldValueTuple>& data = kfvFieldsValues(t);
-        string vrf_name = "", vnet_name = "", , nat_zone = "";
+        string vrf_name = "", vnet_name = "", nat_zone = "";
         uint32_t mtu;
         bool adminUp;
         uint32_t nat_zone_id = 0;
