@@ -35,6 +35,7 @@ extern sai_hostif_api_t* sai_hostif_api;
 extern sai_acl_api_t* sai_acl_api;
 extern sai_queue_api_t *sai_queue_api;
 extern sai_object_id_t gSwitchId;
+extern sai_fdb_api_t *sai_fdb_api;
 extern IntfsOrch *gIntfsOrch;
 extern NeighOrch *gNeighOrch;
 extern CrmOrch *gCrmOrch;
@@ -2585,6 +2586,13 @@ void PortsOrch::doLagTask(Consumer &consumer)
                     if (fvValue(i) == "down")
                     {
                         gNeighOrch->ifChangeInformNextHop(alias, false);
+                        Port lag;
+                        if (getPort(alias, lag))
+                        {
+                            SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
+                                " as it is DOWN", alias.c_str(), lag.m_bridge_port_id);
+                            flushFDBEntries(lag.m_bridge_port_id);
+                        }
                     }
                     else
                     {
@@ -3734,6 +3742,13 @@ void PortsOrch::doTask(NotificationConsumer &consumer)
 
             updatePortOperStatus(port, status);
 
+            if (status == SAI_PORT_OPER_STATUS_DOWN)
+            {
+                SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
+                    " as it is DOWN", port.m_alias.c_str(), port.m_bridge_port_id);
+                flushFDBEntries(port.m_bridge_port_id);
+            }
+
             /* update m_portList */
             m_portList[port.m_alias] = port;
         }
@@ -3916,5 +3931,24 @@ void PortsOrch::getPortSerdesVal(const std::string& val_str,
     {
         lane_val = (uint32_t)std::stoul(lane_str, NULL, 16);
         lane_values.push_back(lane_val);
+    }
+}
+
+void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
+{
+    sai_attribute_t attr;
+    vector<sai_attribute_t> attrs;
+    sai_status_t rv;
+
+    SWSS_LOG_INFO("Flushing the port with bridge port id: %" PRIx64, bridge_port_id);
+
+    attr.id = SAI_FDB_FLUSH_ATTR_BRIDGE_PORT_ID;
+    attr.value.oid = bridge_port_id;
+    attrs.push_back(attr);
+    rv = sai_fdb_api->flush_fdb_entries(gSwitchId, (uint32_t)attrs.size(), attrs.data());
+
+    if (rv != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 "failed: %d", bridge_port_id, rv);
     }
 }

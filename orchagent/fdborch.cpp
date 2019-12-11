@@ -159,7 +159,8 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
         break;
 
     case SAI_FDB_EVENT_FLUSHED:
-        if (bridge_port_id == SAI_NULL_OBJECT_ID && entry->bv_id == SAI_NULL_OBJECT_ID)
+        if ((bridge_port_id == SAI_NULL_OBJECT_ID && entry->bv_id == SAI_NULL_OBJECT_ID)
+            || (bridge_port_id && entry->bv_id == SAI_NULL_OBJECT_ID))
         {
             for (auto itr = m_entries.begin(); itr != m_entries.end();)
             {
