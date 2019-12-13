@@ -105,6 +105,9 @@ public:
 
     bool addSubPort(Port &port, const string &alias, const bool &adminUp = true, const uint32_t &mtu = 0);
     bool removeSubPort(const string &alias);
+
+    void increasePortRouterIntfRefCount(const string &alias);
+    void decreasePortRouterIntfRefCount(const string &alias);
 private:
     unique_ptr<Table> m_counterTable;
     unique_ptr<Table> m_portTable;
@@ -148,7 +151,7 @@ private:
     map<string, Port> m_portList;
     map<string, uint32_t> m_port_ref_count;
     unordered_set<string> m_pendingPortSet;
-
+    map<string, uint32_t> m_port_routerIntf_ref_count;
 
     NotificationConsumer* m_portStatusNotificationConsumer;
 

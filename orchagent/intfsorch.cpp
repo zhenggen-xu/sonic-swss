@@ -224,7 +224,7 @@ bool IntfsOrch::setIntf(const string& alias, sai_object_id_t vrf_id, const IpPre
     {
         if (!ip_prefix && addRouterIntfs(vrf_id, port))
         {
-            gPortsOrch->increasePortRefCount(alias);
+            gPortsOrch->increasePortRouterIntfRefCount(alias);
             IntfsEntry intfs_entry;
             intfs_entry.ref_count = 0;
             intfs_entry.vrf_id = vrf_id;
@@ -346,7 +346,7 @@ bool IntfsOrch::removeIntf(const string& alias, sai_object_id_t vrf_id, const Ip
     {
         if (m_syncdIntfses[alias].ip_addresses.size() == 0 && removeRouterIntfs(port))
         {
-            gPortsOrch->decreasePortRefCount(alias);
+            gPortsOrch->decreasePortRouterIntfRefCount(alias);
             m_syncdIntfses.erase(alias);
             m_vrfOrch->decreaseVrfRefCount(vrf_id);
 
