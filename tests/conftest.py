@@ -698,7 +698,7 @@ class DockerVirtualSwitch(object):
         tbl = swsscommon.Table(self.cdb, "PORT")
         tbl._del(port)
         time.sleep(1)
-        
+
     def create_vlan(self, vlan):
         tbl = swsscommon.Table(self.cdb, "VLAN")
         fvs = swsscommon.FieldValuePairs([("vlanid", vlan)])
@@ -796,6 +796,12 @@ class DockerVirtualSwitch(object):
     def remove_neighbor(self, interface, ip):
         tbl = swsscommon.ProducerStateTable(self.pdb, "NEIGH_TABLE")
         tbl._del(interface + ":" + ip)
+        time.sleep(1)
+
+    def set_neighbor(self, interface, ip, mac):
+        tbl = swsscommon.Table(self.cdb, "NEIGH")
+        fvs = swsscommon.FieldValuePairs([("neigh", mac)])
+        tbl.set(interface + "|" + ip, fvs)
         time.sleep(1)
 
     def setup_db(self):
@@ -940,6 +946,36 @@ class DockerVirtualSwitch(object):
         atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
         acl_table_groups = atbl.getKeys()
         assert len(acl_table_groups) == len(bind_ports)
+
+    def create_l3_intf(self, interface, vrf_name):
+        if interface.startswith("PortChannel"):
+            tbl_name = "PORTCHANNEL_INTERFACE"
+        elif interface.startswith("Vlan"):
+            tbl_name = "VLAN_INTERFACE"
+        elif interface.startswith("Loopback"):
+            tbl_name = "LOOPBACK_INTERFACE"
+        else:
+            tbl_name = "INTERFACE"
+        if len(vrf_name) == 0:
+            fvs = swsscommon.FieldValuePairs([("NULL", "NULL")])
+        else:
+            fvs = swsscommon.FieldValuePairs([("vrf_name", vrf_name)])
+        tbl = swsscommon.Table(self.cdb, tbl_name)
+        tbl.set(interface, fvs)
+        time.sleep(1)
+
+    def remove_l3_intf(self, interface):
+        if interface.startswith("PortChannel"):
+            tbl_name = "PORTCHANNEL_INTERFACE"
+        elif interface.startswith("Vlan"):
+            tbl_name = "VLAN_INTERFACE"
+        elif interface.startswith("Loopback"):
+            tbl_name = "LOOPBACK_INTERFACE"
+        else:
+            tbl_name = "INTERFACE"
+        tbl = swsscommon.Table(self.cdb, tbl_name)
+        tbl._del(interface)
+        time.sleep(1)
 
 @pytest.yield_fixture(scope="module")
 def dvs(request):

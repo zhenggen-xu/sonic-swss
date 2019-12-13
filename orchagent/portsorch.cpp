@@ -3952,3 +3952,42 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
         SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 "failed: %d", bridge_port_id, rv);
     }
 }
+
+void PortsOrch::increasePortRouterIntfRefCount(const string &alias)
+{
+    Port            port;
+
+    if (!getPort(alias, port))
+    {
+        SWSS_LOG_DEBUG("Port %s object not found", alias.c_str());
+        return;
+    }
+
+    assert (m_port_routerIntf_ref_count.find(alias) != m_port_routerIntf_ref_count.end());
+    m_port_routerIntf_ref_count[alias]++;
+
+    SWSS_LOG_DEBUG("Increase Port %s router interface ref count to: %d", alias.c_str(), m_port_routerIntf_ref_count[alias]);
+    port.set_dependency(Port::INTF_DEP);
+}
+
+void PortsOrch::decreasePortRouterIntfRefCount(const string &alias)
+{
+   Port            port;
+
+    if (!getPort(alias, port))
+    {
+        SWSS_LOG_DEBUG("Port %s object not found", alias.c_str());
+       return;
+    }
+
+    assert (m_port_routerIntf_ref_count.find(alias) != m_port_routerIntf_ref_count.end());
+
+    if (m_port_routerIntf_ref_count[alias] > 0)
+        m_port_routerIntf_ref_count[alias]--;
+
+    if (m_port_routerIntf_ref_count[alias] == 0)
+    {
+        SWSS_LOG_DEBUG("Port %s router interface ref count %d: clear dependency", alias.c_str(), m_port_routerIntf_ref_count[alias]);
+        port.clear_dependency(Port::INTF_DEP);
+    }
+}
