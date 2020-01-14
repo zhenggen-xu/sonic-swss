@@ -19,7 +19,7 @@ class TestPortDPBVlan(object):
     @pytest.mark.skip()
     '''
     def test_dependency(self, dvs):
-        dpb = DPB() 
+        dpb = DPB()
         dvs.setup_db()
         p = Port(dvs, "Ethernet0")
         p.sync_from_config_db()
@@ -40,7 +40,7 @@ class TestPortDPBVlan(object):
         assert(p.exists_in_asic_db() == False)
 
         #Create the port back and delete the VLAN
-        p.write_to_config_db() 
+        p.write_to_config_db()
         #print "Added port:%s to config DB"%p.get_name()
         p.verify_config_db()
         #print "Config DB verification passed!"
@@ -48,8 +48,8 @@ class TestPortDPBVlan(object):
         #print "Application DB verification passed!"
         p.verify_asic_db()
         #print "ASIC DB verification passed!"
-       
-        dvs.remove_vlan("100") 
+
+        dvs.remove_vlan("100")
 
     '''
     @pytest.mark.skip()
@@ -82,7 +82,7 @@ class TestPortDPBVlan(object):
         port_names = ["Ethernet0", "Ethernet1", "Ethernet2", "Ethernet3"]
         for pname in port_names:
             dvs.create_vlan_member("100", pname)
-        #print "Add %s to VLAN"%port_names            
+        #print "Add %s to VLAN"%port_names
 
         child_ports = []
         for pname in port_names:
@@ -93,15 +93,15 @@ class TestPortDPBVlan(object):
             assert(cp.exists_in_app_db() == False)
             assert(cp.exists_in_asic_db() == True)
             child_ports.append(cp)
-        #print "Deleted %s from config DB and APP DB"%port_names            
+        #print "Deleted %s from config DB and APP DB"%port_names
 
         for cp in child_ports:
             dvs.remove_vlan_member("100", cp.get_name())
             time.sleep(1)
             assert(cp.exists_in_asic_db() == False)
-        #print "Deleted %s from VLAN"%port_names            
+        #print "Deleted %s from VLAN"%port_names
 
-        p.write_to_config_db() 
+        p.write_to_config_db()
         #print "Added port:%s to config DB"%p.get_name()
         p.verify_config_db()
         #print "Config DB verification passed!"
@@ -112,7 +112,7 @@ class TestPortDPBVlan(object):
 
         dvs.remove_vlan("100")
 
-    '''    
+    '''
     @pytest.mark.skip()
     '''
     def test_one_port_multiple_vlan(self, dvs):
@@ -160,10 +160,10 @@ class TestPortDPBVlan(object):
             assert(cp.exists_in_config_db() == False)
             assert(cp.exists_in_app_db() == False)
             assert(cp.exists_in_asic_db() == False)
-        #print "Deleted %s and verified all DBs"%port_names            
+        #print "Deleted %s and verified all DBs"%port_names
 
         #Add back Ethernet0
-        p.write_to_config_db() 
+        p.write_to_config_db()
         p.verify_config_db()
         p.verify_app_db()
         p.verify_asic_db()
@@ -175,4 +175,56 @@ class TestPortDPBVlan(object):
         dvs.remove_vlan("102")
         #print "All three VLANs removed"
 
+    '''
+    @pytest.mark.skip()
+    '''
+    def test_all_port_100_vlans(self, dvs):
+        num_vlans = 10
+        start_vlan = 100
+        num_ports = 32
+        port_names = []
+        vlan_names = []
+
+        dvs.setup_db()
+
+        for i in range(num_ports):
+            port_names.append("Ethernet" + str(i*4))
+
+        for i in range(num_vlans):
+            vlan_names.append(str(start_vlan + i))
+
+        for vlan_name in vlan_names:
+            dvs.create_vlan(vlan_name)
+        print "%d VLANs created"%num_vlans
+
+        for port_name in port_names:
+            for vlan_name in vlan_names:
+                dvs.create_vlan_member_tagged(vlan_name, port_name)
+        print "All %d ports are added to all %d VLANs"%(num_ports,num_vlans)
+
+        ports = []
+        for port_name in port_names:
+            p = Port(dvs, port_name)
+            ports.append(p)
+            p.sync_from_config_db()
+            p.delete_from_config_db()
+            print "Deleted %s from config DB"%port_name
+            assert(p.exists_in_config_db() == False)
+            assert(p.exists_in_app_db() == False)
+            assert(p.exists_in_asic_db() == True)
+            for vlan_name in vlan_names:
+                dvs.remove_vlan_member(vlan_name, port_name)
+            assert(p.exists_in_asic_db() == False)
+        print "All %d ports are removed from all %d VLANs and deleted"%(num_ports,num_vlans)
+
+        for p in ports:
+            p.write_to_config_db()
+            p.verify_config_db()
+            p.verify_app_db()
+            p.verify_asic_db()
+        print "Re-created all %d ports"%num_ports
+
+        for vlan_name in vlan_names:
+            dvs.remove_vlan(vlan_name)
+        print "All %d VLANs removed"%num_vlans
 
