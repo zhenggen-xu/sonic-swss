@@ -698,7 +698,7 @@ class DockerVirtualSwitch(object):
         tbl = swsscommon.Table(self.cdb, "PORT")
         tbl._del(port)
         time.sleep(1)
-        
+
     def create_vlan(self, vlan):
         tbl = swsscommon.Table(self.cdb, "VLAN")
         fvs = swsscommon.FieldValuePairs([("vlanid", vlan)])
@@ -849,7 +849,7 @@ class DockerVirtualSwitch(object):
     def update_acl_table(self, table, fvs):
         tbl = swsscommon.Table(self.cdb, "ACL_TABLE")
         tbl.set(table, fvs)
-        time.sleep(1) 
+        time.sleep(1)
 
     def get_acl_table_ids(self):
         tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE")
@@ -940,6 +940,19 @@ class DockerVirtualSwitch(object):
         atbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ACL_TABLE_GROUP")
         acl_table_groups = atbl.getKeys()
         assert len(acl_table_groups) == len(bind_ports)
+
+    def change_port_breakout_mode(self, intf_name, target_mode):
+        cmd = "config interface breakout %s %s -y"%(intf_name, target_mode)
+        self.runcmd(cmd)
+        time.sleep(2)
+
+    def verify_port_breakout_mode(self, intf_name, current_mode):
+        brkout_cfg_tbl = swsscommon.Table(self.cdb, "BREAKOUT_CFG")
+        (status, fvs) = brkout_cfg_tbl.get(intf_name)
+        assert(status == True)
+        fvs_dict = self.get_fvs_dict(fvs)
+        assert(fvs_dict["brkout_mode"] == current_mode)
+
 
 @pytest.yield_fixture(scope="module")
 def dvs(request):
