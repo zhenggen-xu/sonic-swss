@@ -115,6 +115,7 @@ public:
     std::vector<sai_object_id_t> m_priority_group_ids;
     sai_port_priority_flow_control_mode_t m_pfc_asym = SAI_PORT_PRIORITY_FLOW_CONTROL_MODE_COMBINED;
     uint8_t m_pfc_bitmask = 0;
+<<<<<<< HEAD
     std::unordered_set<sai_object_id_t> m_ingress_acl_tables_uset;
     std::unordered_set<sai_object_id_t> m_egress_acl_tables_uset;
 
@@ -146,6 +147,16 @@ public:
         }
         return deps; 
     }
+    /*
+     * Following two bit vectors are used to lock
+     * the PG/queue from being changed in BufferOrch.
+     * The use case scenario is when PfcWdZeroBufferHandler
+     * sets zero buffer profile it should protect PG/queue
+     * from being overwritten in BufferOrch.
+     */
+    std::vector<bool> m_queue_lock;
+    std::vector<bool> m_priority_group_lock;
+
 };
 
 }

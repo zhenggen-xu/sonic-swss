@@ -22,7 +22,7 @@ bool AclOrch::m_bCollectCounters = true;
 sai_uint32_t AclRule::m_minPriority = 0;
 sai_uint32_t AclRule::m_maxPriority = 0;
 
-swss::DBConnector AclOrch::m_db(COUNTERS_DB, DBConnector::DEFAULT_UNIXSOCKET, 0);
+swss::DBConnector AclOrch::m_db("COUNTERS_DB", 0);
 swss::Table AclOrch::m_countersTable(&m_db, "COUNTERS");
 
 extern sai_acl_api_t*    sai_acl_api;
@@ -1424,7 +1424,7 @@ bool AclTable::create()
     attr.value.s32 = acl_stage;
     table_attrs.push_back(attr);
 
-    if (type == ACL_TABLE_MIRROR)
+    if (type == ACL_TABLE_MIRROR || type == ACL_TABLE_MIRRORV6)
     {
         attr.id = SAI_ACL_TABLE_ATTR_FIELD_DSCP;
         attr.value.booldata = true;
