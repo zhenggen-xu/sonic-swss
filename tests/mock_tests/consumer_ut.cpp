@@ -8,7 +8,6 @@ extern PortsOrch *gPortsOrch;
 
 namespace consumer_test
 {
-
     using namespace std;
 
     struct ConsumerTest : public ::testing::Test
@@ -79,7 +78,7 @@ namespace consumer_test
     TEST_F(ConsumerTest, ConsumerAddToSync_Set)
     {
 
-        // Test 1, one set_command
+        // Test case, one set_command
         auto entry = KeyOpFieldsValuesTuple(
             { key,
                 SET_COMMAND,
@@ -94,7 +93,7 @@ namespace consumer_test
 
     TEST_F(ConsumerTest, ConsumerAddToSync_Del)
     {
-        // Test 2, one with del_command
+        // Test case, one with del_command
         auto entry = KeyOpFieldsValuesTuple(
             { key,
                 DEL_COMMAND,
@@ -110,7 +109,7 @@ namespace consumer_test
 
     TEST_F(ConsumerTest, ConsumerAddToSync_Set_Del)
     {
-        // Test3, add SET then DEL
+        // Test case, add SET then DEL
         auto entrya = KeyOpFieldsValuesTuple(
             { key,
                 SET_COMMAND,
@@ -144,7 +143,7 @@ namespace consumer_test
                 { { f1, v1a },
                     { f2, v2a } } });
 
-        // Test4, add DEL then SET, re-try 100 times, order should be kept
+        // Test case, add DEL then SET, re-try 100 times, order should be kept
         for (auto x = 0; x < 100; x++)
         {
             kofv_q.push_back(entrya);
@@ -160,9 +159,9 @@ namespace consumer_test
         }
     }
 
-    TEST_F(ConsumerTest, ConsumerAddToSync_Set_Del_Set_multi)
+    TEST_F(ConsumerTest, ConsumerAddToSync_Set_Del_Set_Multi)
     {
-        // Test5, add SET, DEL then SET, re-try 100 times in addTosync, order should be kept
+        // Test5, add SET, DEL then SET, re-try 100 times , order should be kept
         auto entrya = KeyOpFieldsValuesTuple(
             { key,
                 SET_COMMAND,
@@ -193,12 +192,48 @@ namespace consumer_test
 
             exp_kofv = entryc;
             validate_syncmap(consumer->m_toSync, 1, key, exp_kofv);
-            }
+        }
+    }
+
+    TEST_F(ConsumerTest, ConsumerAddToSync_Set_Del_Set_Multi_In_Q)
+    {
+        // Test5, add SET, DEL then SET, repeat 100 times in queue, final result and order should be kept
+        auto entrya = KeyOpFieldsValuesTuple(
+            { key,
+                SET_COMMAND,
+                { { f1, v1a },
+                    { f2, v2a } } });
+
+        auto entryb = KeyOpFieldsValuesTuple(
+            { key,
+                DEL_COMMAND,
+                { { } } });
+
+        auto entryc = KeyOpFieldsValuesTuple(
+            { key,
+                SET_COMMAND,
+                { { f1, v1a },
+                    { f2, v2a } } });
+
+        for (auto x = 0; x < 100; x++)
+        {
+            kofv_q.push_back(entrya);
+            kofv_q.push_back(entryb);
+            kofv_q.push_back(entryc);
+        }
+        consumer->addToSync(kofv_q);
+
+        // expect DEL then SET
+        exp_kofv = entryb;
+        validate_syncmap(consumer->m_toSync, 2, key, exp_kofv);
+
+        exp_kofv = entryc;
+        validate_syncmap(consumer->m_toSync, 1, key, exp_kofv);
     }
 
     TEST_F(ConsumerTest, ConsumerAddToSync_Del_Set_Setnew)
     {
-        // Test 6, DEL, SET, then SET with different value
+        // Test case, DEL, SET, then SET with different value
         auto entrya = KeyOpFieldsValuesTuple(
             { key,
                 DEL_COMMAND,
@@ -231,7 +266,7 @@ namespace consumer_test
 
     TEST_F(ConsumerTest, ConsumerAddToSync_Del_Set_Setnew1)
     {
-        // Test 7, DEL, SET, then SET with new values and new fields
+        // Test case, DEL, SET, then SET with new values and new fields
         auto entrya = KeyOpFieldsValuesTuple(
             { key,
                 DEL_COMMAND,
@@ -270,7 +305,7 @@ namespace consumer_test
 
     TEST_F(ConsumerTest, ConsumerAddToSync_Ind_Set_Del)
     {
-        // Test 8,  Add individuals by addToSync, SET then DEL
+        // Test case,  Add individuals by addToSync, SET then DEL
         auto entrya = KeyOpFieldsValuesTuple(
             { key,
                 SET_COMMAND,

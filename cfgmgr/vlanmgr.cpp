@@ -448,7 +448,6 @@ void VlanMgr::processUntaggedVlanMembers(string vlan, const string &members)
             FieldValueTuple t("tagging_mode", "untagged");
             fvVector.push_back(t);
             KeyOpFieldsValuesTuple tuple =  make_tuple(member_key, SET_COMMAND, fvVector);
-            //consumer.m_toSync.emplace(member_key, tuple);
             consumer.addToSync(tuple);
             SWSS_LOG_DEBUG("%s", (dumpTuple(consumer, tuple)).c_str());
         }
