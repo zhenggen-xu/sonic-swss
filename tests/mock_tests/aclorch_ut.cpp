@@ -151,7 +151,6 @@ namespace aclorch_test
             auto consumer = unique_ptr<Consumer>(new Consumer(
                 new swss::ConsumerStateTable(config_db, CFG_ACL_TABLE_TABLE_NAME, 1, 1), m_aclOrch, CFG_ACL_TABLE_TABLE_NAME));
 
-            //consumerAddToSync(consumer.get(), entries);
             consumer->addToSync(entries);
             static_cast<Orch *>(m_aclOrch)->doTask(*consumer);
         }
@@ -161,7 +160,6 @@ namespace aclorch_test
             auto consumer = unique_ptr<Consumer>(new Consumer(
                 new swss::ConsumerStateTable(config_db, CFG_ACL_RULE_TABLE_NAME, 1, 1), m_aclOrch, CFG_ACL_RULE_TABLE_NAME));
 
-            //consumerAddToSync(consumer.get(), entries);
             consumer->addToSync(entries);
             static_cast<Orch *>(m_aclOrch)->doTask(*consumer);
         }
@@ -333,7 +331,6 @@ namespace aclorch_test
             auto consumer = unique_ptr<Consumer>(new Consumer(
                 new swss::ConsumerStateTable(m_app_db.get(), APP_PORT_TABLE_NAME, 1, 1), gPortsOrch, APP_PORT_TABLE_NAME));
 
-            //consumerAddToSync(consumer.get(), { { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
             consumer->addToSync({ { "PortInitDone", EMPTY_PREFIX, { { "", "" } } } });
             static_cast<Orch *>(gPortsOrch)->doTask(*consumer.get());
         }
