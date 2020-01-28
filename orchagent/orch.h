@@ -56,6 +56,10 @@ typedef std::pair<std::string, sai_object_id_t> object_map_pair;
 
 typedef std::map<std::string, object_map*> type_map;
 typedef std::pair<std::string, object_map*> type_map_pair;
+
+// Use multimap to support multiple OpFieldsValues for the same key (e,g, DEL and SET)
+// The order of the key-value pairs whose keys compare equivalent is the order of
+// insertion and does not change. (since C++11)
 typedef std::multimap<std::string, swss::KeyOpFieldsValuesTuple> SyncMap;
 
 typedef std::pair<std::string, int> table_name_with_pri_t;
