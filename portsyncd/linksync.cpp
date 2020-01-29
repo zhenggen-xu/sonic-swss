@@ -156,7 +156,7 @@ LinkSync::LinkSync(DBConnector *appl_db, DBConnector *state_db) :
 void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
 {
     SWSS_LOG_ENTER();
-    
+
     if ((nlmsg_type != RTM_NEWLINK) && (nlmsg_type != RTM_DELLINK))
     {
         return;
@@ -211,7 +211,9 @@ void LinkSync::onMsg(int nlmsg_type, struct nl_object *obj)
         return;
     }
 
-    /* If this is a bridge port, return */
+    /* If netlink for this port has master, we ignore that for now
+     * This could be the case where the port was removed from VLAN bridge
+     */
     if (master)
     {
         return;

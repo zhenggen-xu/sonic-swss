@@ -1446,14 +1446,14 @@ bool PortsOrch::removePort(sai_object_id_t port_id)
         notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
     }
 
-    removeAclTableGroup(p);
-
     sai_status_t status = sai_port_api->remove_port(port_id);
     if (status != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("Failed to remove port %" PRIx64 ", rv:%d", port_id, status);
         return false;
     }
+
+    removeAclTableGroup(p);
 
     m_portCount--;
     SWSS_LOG_NOTICE("Remove port %" PRIx64, port_id);
@@ -1621,7 +1621,7 @@ void PortsOrch::cleanPortTable(const vector<string>& keys)
 void PortsOrch::removePortFromLanesMap(string alias)
 {
 
-    for (auto it = m_lanesAliasSpeedMap.begin(); it != m_lanesAliasSpeedMap.end();)
+    for (auto it = m_lanesAliasSpeedMap.begin(); it != m_lanesAliasSpeedMap.end(); it++)
     {
         if (get<0>(it->second) == alias)
         {
@@ -1629,14 +1629,13 @@ void PortsOrch::removePortFromLanesMap(string alias)
             it = m_lanesAliasSpeedMap.erase(it);
             break;
         }
-        it++;
     }
 }
 
 void PortsOrch::removePortFromPortListMap(sai_object_id_t port_id)
 {
 
-    for (auto it = m_portListLaneMap.begin(); it != m_portListLaneMap.end();)
+    for (auto it = m_portListLaneMap.begin(); it != m_portListLaneMap.end(); it++)
     {
         if (it->second == port_id)
         {
@@ -1644,7 +1643,6 @@ void PortsOrch::removePortFromPortListMap(sai_object_id_t port_id)
             it = m_portListLaneMap.erase(it);
             break;
         }
-        it++;
     }
 }
 
@@ -2165,6 +2163,10 @@ void PortsOrch::doPortTask(Consumer &consumer)
 
             /* Delete port from port list */
             m_portList.erase(alias);
+        }
+        else
+        {
+            SWSS_LOG_ERROR("Unknown operation type %s", op.c_str());
         }
 
         it = consumer.m_toSync.erase(it);
