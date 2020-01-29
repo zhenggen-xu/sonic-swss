@@ -149,7 +149,6 @@ public:
 
     void addToSync(const swss::KeyOpFieldsValuesTuple &entry);
 
-protected:
     // Returns: the number of entries added to m_toSync
     size_t addToSync(const std::deque<swss::KeyOpFieldsValuesTuple> &entries);
 };

@@ -107,7 +107,7 @@ void Consumer::addToSync(const KeyOpFieldsValuesTuple &entry)
         * In case there is one key-value, it should be DEL or SET
         * In case there are two key-value pairs, it should be DEL then SET
         * The code logic is following:
-        * We iterating the values with the key, we skip the value with DEL and then
+        * We iterate the values with the key, we skip the value with DEL and then
         * check if that was the only one (I,E, the iter pointer now points to end or next key),
         * in such case, we insert the key-value with SET.
         * If there was a SET already (I,E, the pointer still points to the same key), we combine the kfv.
@@ -120,7 +120,7 @@ void Consumer::addToSync(const KeyOpFieldsValuesTuple &entry)
             if (old_op == SET_COMMAND)
                 break;
         }
-        if (iter == m_toSync.end() || iter->first != key)
+        if (iter == ret.second)
         {
             m_toSync.emplace(key, entry);
         }
@@ -148,8 +148,7 @@ void Consumer::addToSync(const KeyOpFieldsValuesTuple &entry)
                 }
                 existing_values.push_back(FieldValueTuple(field, value));
             }
-            m_toSync.erase(iter);
-            m_toSync.emplace(key, KeyOpFieldsValuesTuple(key, op, existing_values));
+            iter->second = KeyOpFieldsValuesTuple(key, op, existing_values);
         }
     }
 
