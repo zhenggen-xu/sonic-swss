@@ -405,7 +405,7 @@ void RouteOrch::doTask(Consumer& consumer)
                     {
                         vector<FieldValueTuple> v;
                         key = vrf + i.first.to_string();
-                        KeyOpFieldsValuesTuple x = KeyOpFieldsValuesTuple(key, DEL_COMMAND, v);
+                        auto x = KeyOpFieldsValuesTuple(key, DEL_COMMAND, v);
                         consumer.addToSync(x);
                     }
                 }
