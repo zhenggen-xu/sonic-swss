@@ -1540,13 +1540,12 @@ void PortsOrch::deInitPort(string alias, sai_object_id_t port_id)
     Port p(alias, Port::PHY);
     p.m_port_id = port_id;
 
+    /* remove port from flex_counter_table for updating counters  */
+    port_stat_manager.clearCounterIdList(p.m_port_id);
+
     /* remove port name map from counter table */
     RedisClient redisClient(m_counter_db.get());
     redisClient.hdel(COUNTERS_PORT_NAME_MAP, alias);
-
-    /* remove port from flex_counter_table for updating counters  */
-    string key = getPortFlexCounterTableKey(sai_serialize_object_id(port_id));
-    m_flexCounterTable->del(key);
 
     SWSS_LOG_NOTICE("De-Initialized port %s", alias.c_str());
 }
