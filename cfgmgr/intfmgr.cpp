@@ -602,8 +602,12 @@ bool IntfMgr::doIntfAddrTask(const vector<string>& keys,
     {
         setIntfIp(alias, "del", ip_prefix);
 
-        m_appIntfTableProducer.del(appKey);
-        m_stateIntfTable.del(keys[0] + state_db_key_delimiter + keys[1]);
+        // Don't send link local config to AppDB and Orchagent
+        if (ip_prefix.getIp().getAddrScope() != IpAddress::AddrScope::LINK_SCOPE)
+        {
+            m_appIntfTableProducer.del(appKey);
+            m_stateIntfTable.del(keys[0] + state_db_key_delimiter + keys[1]);
+        }
     }
     else
     {
