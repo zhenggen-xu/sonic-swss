@@ -146,6 +146,8 @@ public:
         }
         return deps; 
     }
+    uint32_t m_nat_zone_id = 0;
+
     /*
      * Following two bit vectors are used to lock
      * the PG/queue from being changed in BufferOrch.

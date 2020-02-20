@@ -65,6 +65,7 @@ static acl_rule_attr_lookup_t aclL3ActionLookup =
 {
     { ACTION_PACKET_ACTION,                    SAI_ACL_ENTRY_ATTR_ACTION_PACKET_ACTION },
     { ACTION_REDIRECT_ACTION,                  SAI_ACL_ENTRY_ATTR_ACTION_REDIRECT },
+    { ACTION_DO_NOT_NAT_ACTION,                SAI_ACL_ENTRY_ATTR_ACTION_NO_NAT },
 };
 
 static acl_rule_attr_lookup_t aclMirrorStageLookup =
@@ -206,6 +207,13 @@ bool AclRule::validateAddMatch(string attr_name, string attr_value)
                     SWSS_LOG_ERROR("Failed to locate port %s", alias.c_str());
                     return false;
                 }
+
+                if (port.m_type != Port::PHY)
+                {
+                    SWSS_LOG_ERROR("Cannot bind rule to %s: IN_PORTS can only match physical interfaces", alias.c_str());
+                    return false;
+                }
+
                 m_inPorts.push_back(port.m_port_id);
             }
 
@@ -230,6 +238,13 @@ bool AclRule::validateAddMatch(string attr_name, string attr_value)
                     SWSS_LOG_ERROR("Failed to locate port %s", alias.c_str());
                     return false;
                 }
+
+                if (port.m_type != Port::PHY)
+                {
+                    SWSS_LOG_ERROR("Cannot bind rule to %s: OUT_PORTS can only match physical interfaces", alias.c_str());
+                    return false;
+                }
+
                 m_outPorts.push_back(port.m_port_id);
             }
 
@@ -797,6 +812,12 @@ bool AclRuleL3::validateAddAction(string attr_name, string _attr_value)
 
             action_str = ACTION_REDIRECT_ACTION;
         }
+        // handle PACKET_ACTION_DO_NOT_NAT in ACTION_PACKET_ACTION
+        else if (attr_value == PACKET_ACTION_DO_NOT_NAT)
+        {
+            value.aclaction.parameter.booldata = true;
+            action_str = ACTION_DO_NOT_NAT_ACTION;
+        }
         else
         {
             return false;
@@ -1322,6 +1343,8 @@ bool AclTable::create()
      * |------------------------------------------------------------------|
      * | MARTCH_ETHERTYPE  |      √       |      √       |                |
      * |------------------------------------------------------------------|
+     * | MATCH_IN_PORTS    |      √       |      √       |                |
+     * |------------------------------------------------------------------|
      */
 
     if (type == ACL_TABLE_MIRROR)
@@ -1339,6 +1362,10 @@ bool AclTable::create()
         table_attrs.push_back(attr);
 
         attr.id = SAI_ACL_TABLE_ATTR_FIELD_ICMP_CODE;
+        attr.value.booldata = true;
+        table_attrs.push_back(attr);
+
+        attr.id = SAI_ACL_TABLE_ATTR_FIELD_IN_PORTS;
         attr.value.booldata = true;
         table_attrs.push_back(attr);
 
@@ -2068,6 +2095,7 @@ void AclOrch::init(vector<TableConnector>& connectors, PortsOrch *portOrch, Mirr
     string platform = getenv("platform") ? getenv("platform") : "";
     if (platform == BRCM_PLATFORM_SUBSTRING ||
             platform == MLNX_PLATFORM_SUBSTRING ||
+            platform == BFN_PLATFORM_SUBSTRING  ||
             platform == NPS_PLATFORM_SUBSTRING)
     {
         m_mirrorTableCapabilities =
@@ -2098,7 +2126,8 @@ void AclOrch::init(vector<TableConnector>& connectors, PortsOrch *portOrch, Mirr
     }
 
     // In Mellanox platform, V4 and V6 rules are stored in different tables
-    if (platform == MLNX_PLATFORM_SUBSTRING) {
+    if (platform == MLNX_PLATFORM_SUBSTRING ||
+        platform == BFN_PLATFORM_SUBSTRING) {
         m_isCombinedMirrorV6Table = false;
     }
 
