@@ -1563,13 +1563,6 @@ bool PortsOrch::removePort(sai_object_id_t port_id)
 {
     SWSS_LOG_ENTER();
 
-    Port p;
-    if (getPort(port_id, p))
-    {
-        PortUpdate update = {p, false };
-        notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
-    }
-
     sai_status_t status = sai_port_api->remove_port(port_id);
     if (status != SAI_STATUS_SUCCESS)
     {
@@ -2326,6 +2319,13 @@ void PortsOrch::doPortTask(Consumer &consumer)
                     throw runtime_error("Remove hostif for the port failed");
                 }
                 m_portList[alias].m_init = false;
+
+                Port p;
+                if (getPort(port_id, p))
+                {
+                    PortUpdate update = {p, false };
+                    notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
+                }
             }
 
             if (!removePort(port_id))
