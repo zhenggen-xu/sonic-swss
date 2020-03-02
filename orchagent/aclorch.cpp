@@ -1518,7 +1518,6 @@ void AclTable::update(SubjectType type, void *cntx)
                             port.m_alias.c_str(), id.c_str());
         }
     }
-
 }
 
 bool AclTable::bind(sai_object_id_t portOid)

@@ -2309,12 +2309,15 @@ void PortsOrch::doPortTask(Consumer &consumer)
             auto hif_id = m_portList[alias].m_hif_id;
             auto bridge_port_oid = m_portList[alias].m_bridge_port_id;
 
-            if (bridge_port_oid != SAI_NULL_OBJECT_ID) {
+            if (bridge_port_oid != SAI_NULL_OBJECT_ID)
+            {
+                SWSS_LOG_NOTICE("Cannot remove port as brodge port OID is present %lx", bridge_port_oid);
                 it++;
                 continue;
             } 
 
-            if (m_portList[alias].m_init) {
+            if (m_portList[alias].m_init)
+            {
                 deinitport(alias, port_id);
                 SWSS_LOG_NOTICE("Removing hostif %lx for Port %s", hif_id, alias.c_str());
                 sai_status_t status = sai_hostif_api->remove_hostif(hif_id);
