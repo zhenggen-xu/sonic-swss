@@ -4046,8 +4046,13 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
     vector<sai_attribute_t> attrs;
     sai_status_t rv;
 
-    SWSS_LOG_INFO("Flushing the port with bridge port id: %" PRIx64, bridge_port_id);
+    if (SAI_NULL_OBJECT_ID == bridge_port_id)
+    {
+        SWSS_LOG_WARN("null bridge port ID");
+        return;
+    }
 
+    SWSS_LOG_INFO("Flushing the port with bridge port id: %" PRIx64, bridge_port_id);
     attr.id = SAI_FDB_FLUSH_ATTR_BRIDGE_PORT_ID;
     attr.value.oid = bridge_port_id;
     attrs.push_back(attr);
