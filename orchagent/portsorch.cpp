@@ -1687,7 +1687,7 @@ void PortsOrch::deinitport(string alias, sai_object_id_t port_id)
     string key = getPortFlexCounterTableKey(sai_serialize_object_id(port_id));
     m_flexCounterTable->del(key);
 
-    
+
     SWSS_LOG_NOTICE("De-Initialized port %s", alias.c_str());
 }
 
@@ -2305,13 +2305,13 @@ void PortsOrch::doPortTask(Consumer &consumer)
             if (bridge_port_oid != SAI_NULL_OBJECT_ID)
             {
                 // Bridge port OID is set on a port as long as
-                // port is part of at-least one VLAN. 
-                // Ideally this should be tracked by SAI redis. 
+                // port is part of at-least one VLAN.
+                // Ideally this should be tracked by SAI redis.
                 // Until then, let this snippet be here.
-                SWSS_LOG_NOTICE("Cannot remove port as brodge port OID is present %lx", bridge_port_oid);
+                SWSS_LOG_NOTICE("Cannot remove port as bridge port OID is present %lx", bridge_port_oid);
                 it++;
                 continue;
-            } 
+            }
 
             if (m_portList[alias].m_init)
             {
