@@ -3498,9 +3498,6 @@ bool PortsOrch::removeLag(Port lag)
     m_portList.erase(lag.m_alias);
     m_port_ref_count.erase(lag.m_alias);
 
-    PortUpdate update = { lag, false };
-    notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
-
     m_counterLagTable->hdel("", lag.m_alias);
 
     return true;
