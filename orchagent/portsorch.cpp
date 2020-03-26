@@ -162,6 +162,12 @@ PortsOrch::PortsOrch(DBConnector *db, vector<table_name_with_pri_t> &tableNames)
     m_counter_db = shared_ptr<DBConnector>(new DBConnector("COUNTERS_DB", 0));
     m_counterTable = unique_ptr<Table>(new Table(m_counter_db.get(), COUNTERS_PORT_NAME_MAP));
 
+    m_counterLagTable = unique_ptr<Table>(new Table(m_counter_db.get(), COUNTERS_LAG_NAME_MAP));
+    FieldValueTuple tuple("", "");
+    vector<FieldValueTuple> defaultLagFv;
+    defaultLagFv.push_back(tuple);
+    m_counterLagTable->set("", defaultLagFv);
+
     /* Initialize port table */
     m_portTable = unique_ptr<Table>(new Table(db, APP_PORT_TABLE_NAME));
 
@@ -2737,39 +2743,51 @@ void PortsOrch::doLagMemberTask(Consumer &consumer)
                     status = fvValue(i);
             }
 
+            if (lag.m_members.find(port_alias) == lag.m_members.end())
+            {
+                /* Assert the port doesn't belong to any LAG already */
+                assert(!port.m_lag_id && !port.m_lag_member_id);
+
+                if (!addLagMember(lag, port))
+                {
+                    it++;
+                    continue;
+                }
+            }
+
             /* Sync an enabled member */
             if (status == "enabled")
             {
-                /* Duplicate entry */
-                if (lag.m_members.find(port_alias) != lag.m_members.end())
+                /* enable collection first, distribution-only mode
+                 * is not supported on Mellanox platform
+                 */
+                if (setCollectionOnLagMember(port, true) &&
+                    setDistributionOnLagMember(port, true))
                 {
                     it = consumer.m_toSync.erase(it);
+                }
+                else
+                {
+                    it++;
                     continue;
                 }
-
-                /* Assert the port doesn't belong to any LAG */
-                assert(!port.m_lag_id && !port.m_lag_member_id);
-
-                if (addLagMember(lag, port))
-                    it = consumer.m_toSync.erase(it);
-                else
-                    it++;
             }
             /* Sync an disabled member */
             else /* status == "disabled" */
             {
-                /* "status" is "disabled" at start when m_lag_id and
-                 * m_lag_member_id are absent */
-                if (!port.m_lag_id || !port.m_lag_member_id)
+                /* disable distribution first, distribution-only mode
+                 * is not supported on Mellanox platform
+                 */
+                if (setDistributionOnLagMember(port, false) &&
+                    setCollectionOnLagMember(port, false))
                 {
                     it = consumer.m_toSync.erase(it);
+                }
+                else
+                {
+                    it++;
                     continue;
                 }
-
-                if (removeLagMember(lag, port))
-                    it = consumer.m_toSync.erase(it);
-                else
-                    it++;
             }
         }
         /* Remove a LAG member */
@@ -2787,9 +2805,13 @@ void PortsOrch::doLagMemberTask(Consumer &consumer)
             }
 
             if (removeLagMember(lag, port))
+            {
                 it = consumer.m_toSync.erase(it);
+            }
             else
+            {
                 it++;
+            }
         }
         else
         {
@@ -3429,6 +3451,11 @@ bool PortsOrch::addLag(string lag_alias)
     PortUpdate update = { lag, true };
     notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
 
+    FieldValueTuple tuple(lag_alias, sai_serialize_object_id(lag_id));
+    vector<FieldValueTuple> fields;
+    fields.push_back(tuple);
+    m_counterLagTable->set("", fields);
+
     return true;
 }
 
@@ -3470,6 +3497,11 @@ bool PortsOrch::removeLag(Port lag)
 
     m_portList.erase(lag.m_alias);
     m_port_ref_count.erase(lag.m_alias);
+
+    PortUpdate update = { lag, false };
+    notify(SUBJECT_TYPE_PORT_CHANGE, static_cast<void *>(&update));
+
+    m_counterLagTable->hdel("", lag.m_alias);
 
     return true;
 }
@@ -3577,6 +3609,52 @@ bool PortsOrch::removeLagMember(Port &lag, Port &port)
     }
     LagMemberUpdate update = { lag, port, false };
     notify(SUBJECT_TYPE_LAG_MEMBER_CHANGE, static_cast<void *>(&update));
+
+    return true;
+}
+
+bool PortsOrch::setCollectionOnLagMember(Port &lagMember, bool enableCollection)
+{
+    /* Port must be LAG member */
+    assert(port.m_lag_member_id);
+
+    sai_status_t status = SAI_STATUS_FAILURE;
+    sai_attribute_t attr {};
+
+    attr.id = SAI_LAG_MEMBER_ATTR_INGRESS_DISABLE;
+    attr.value.booldata = !enableCollection;
+
+    status = sai_lag_api->set_lag_member_attribute(lagMember.m_lag_member_id, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Failed to %s collection on LAG member %s",
+            enableCollection ? "enable" : "disable",
+            lagMember.m_alias.c_str());
+        return false;
+    }
+
+    return true;
+}
+
+bool PortsOrch::setDistributionOnLagMember(Port &lagMember, bool enableDistribution)
+{
+    /* Port must be LAG member */
+    assert(port.m_lag_member_id);
+
+    sai_status_t status = SAI_STATUS_FAILURE;
+    sai_attribute_t attr {};
+
+    attr.id = SAI_LAG_MEMBER_ATTR_EGRESS_DISABLE;
+    attr.value.booldata = !enableDistribution;
+
+    status = sai_lag_api->set_lag_member_attribute(lagMember.m_lag_member_id, &attr);
+    if (status != SAI_STATUS_SUCCESS)
+    {
+        SWSS_LOG_ERROR("Failed to %s distribution on LAG member %s",
+            enableDistribution ? "enable" : "disable",
+            lagMember.m_alias.c_str());
+        return false;
+    }
 
     return true;
 }

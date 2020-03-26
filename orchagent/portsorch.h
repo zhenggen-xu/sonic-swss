@@ -107,6 +107,7 @@ public:
     bool removeSubPort(const string &alias);
 private:
     unique_ptr<Table> m_counterTable;
+    unique_ptr<Table> m_counterLagTable;
     unique_ptr<Table> m_portTable;
     unique_ptr<Table> m_queueTable;
     unique_ptr<Table> m_queuePortTable;
@@ -186,6 +187,8 @@ private:
     bool removeLag(Port lag);
     bool addLagMember(Port &lag, Port &port);
     bool removeLagMember(Port &lag, Port &port);
+    bool setCollectionOnLagMember(Port &lagMember, bool enableCollection);
+    bool setDistributionOnLagMember(Port &lagMember, bool enableDistribution);
     void getLagMember(Port &lag, vector<Port> &portv);
 
     bool addPort(const set<int> &lane_set, uint32_t speed, int an=0, string fec="");
