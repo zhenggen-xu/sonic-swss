@@ -429,6 +429,8 @@ void FdbOrch::flushFDBEntry(sai_object_id_t bridge_port_oid,
     if (SAI_NULL_OBJECT_ID == bridge_port_oid ||
         SAI_NULL_OBJECT_ID == vlan_oid)
     {
+        SWSS_LOG_WARN("Couldn't flush FDB. Bridge port OID: 0x%" PRIx64 " bvid:%" PRIx64 ",",
+                      bridge_port_oid, vlan_oid);
         return;
     }
 
