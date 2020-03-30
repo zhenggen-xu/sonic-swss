@@ -417,8 +417,8 @@ void FdbOrch::doTask(NotificationConsumer& consumer)
     }
 }
 
-void FdbOrch::flushFDBEntry(sai_object_id_t bridge_port_oid,
-                            sai_object_id_t vlan_oid)
+void FdbOrch::flushFDBEntries(sai_object_id_t bridge_port_oid,
+                              sai_object_id_t vlan_oid)
 {
     vector<sai_attribute_t>    attrs;
     sai_attribute_t            attr;
@@ -459,7 +459,7 @@ void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
     {
         swss::Port vlan = update.vlan;
         swss::Port port = update.member;
-        flushFDBEntry(port.m_bridge_port_id, vlan.m_vlan_info.vlan_oid);
+        flushFDBEntries(port.m_bridge_port_id, vlan.m_vlan_info.vlan_oid);
         return;
     }
 

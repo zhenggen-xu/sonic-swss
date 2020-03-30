@@ -62,8 +62,8 @@ private:
     void updateVlanMember(const VlanMemberUpdate&);
     bool addFdbEntry(const FdbEntry&, const string&, const string&);
     bool removeFdbEntry(const FdbEntry&);
-    void flushFDBEntry(sai_object_id_t bridge_port_oid,
-                       sai_object_id_t vlan_oid);
+    void flushFDBEntries(sai_object_id_t bridge_port_oid,
+                         sai_object_id_t vlan_oid);
 
     bool storeFdbEntryState(const FdbUpdate& update);
 };
