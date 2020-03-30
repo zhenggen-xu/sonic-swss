@@ -3188,8 +3188,7 @@ bool PortsOrch::removeBridgePort(Port &port)
     }
 
     /* Flush FDB entries pointing to this bridge port */
-    // TODO: Remove all FDB entries associated with this bridge port before
-    //       removing the bridge port itself
+    flushFDBEntries(port.m_bridge_port_id);
 
     /* Remove bridge port */
     status = sai_bridge_api->remove_bridge_port(port.m_bridge_port_id);
@@ -4064,6 +4063,6 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
 
     if (rv != SAI_STATUS_SUCCESS)
     {
-        SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 "failed: %d", bridge_port_id, rv);
+        SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 " failed: %d", bridge_port_id, rv);
     }
 }
