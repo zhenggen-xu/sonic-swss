@@ -221,8 +221,6 @@ class DPB():
             #dvs.runcmd("ip link delete " + cp.get_name())
         #print "Deleted child ports:%s from config DB"%port_names
 
-        #time.sleep(2)
-
         for cp in child_ports:
             assert(cp.exists_in_config_db() == False)
         for cp in child_ports:
@@ -253,7 +251,6 @@ class DPB():
             cp.write_to_config_db()
             child_port_names.append(cp.get_name())
         #print "Added child ports:%s to config DB"%child_port_names
-        time.sleep(6)
 
         for cp in child_ports:
             assert(cp.exists_in_config_db() == True)
@@ -278,7 +275,7 @@ class DPB():
         # TBD, need vs lib to support hostif removal
         #dvs.runcmd("ip link delete " + p.get_name())
         #print "Deleted port:%s from config DB"%port_name
-        time.sleep(6)
+        time.sleep(2)
 
         # Verify port is deleted from all DBs
         assert(p.exists_in_config_db() == False)
