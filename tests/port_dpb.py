@@ -53,7 +53,7 @@ class Port():
         self._index = index
 
     def set_oid(self, oid = None):
-        self._oid = oid 
+        self._oid = oid
 
     def get_speed(self):
         return self._speed
@@ -154,7 +154,7 @@ class Port():
                                           ("speed", speed_str),
                                           ("index", index_str)])
         self._cfg_db_ptbl.set(self.get_name(), fvs)
-        time.sleep(1)
+        time.sleep(2)
 
     def get_fvs_dict(self, fvs):
         fvs_dict = {}
@@ -217,11 +217,9 @@ class DPB():
 
         for cp in child_ports:
             cp.delete_from_config_db()
-            # TBD, need vs lib to support removing hostif 
+            # TBD, need vs lib to support removing hostif
             #dvs.runcmd("ip link delete " + cp.get_name())
         #print "Deleted child ports:%s from config DB"%port_names
-
-        time.sleep(6)
 
         for cp in child_ports:
             assert(cp.exists_in_config_db() == False)
@@ -235,7 +233,6 @@ class DPB():
         p.port_merge(child_ports)
         p.write_to_config_db()
         #print "Added port:%s to config DB"%p.get_name()
-        time.sleep(2)
 
         p.verify_config_db()
         #print "Config DB verification passed!"
@@ -254,7 +251,6 @@ class DPB():
             cp.write_to_config_db()
             child_port_names.append(cp.get_name())
         #print "Added child ports:%s to config DB"%child_port_names
-        time.sleep(6)
 
         for cp in child_ports:
             assert(cp.exists_in_config_db() == True)
@@ -279,13 +275,13 @@ class DPB():
         # TBD, need vs lib to support hostif removal
         #dvs.runcmd("ip link delete " + p.get_name())
         #print "Deleted port:%s from config DB"%port_name
-        time.sleep(6)
+        time.sleep(2)
 
         # Verify port is deleted from all DBs
         assert(p.exists_in_config_db() == False)
         assert(p.exists_in_app_db() == False)
         assert(p.exists_in_asic_db() == False)
-        
+
         self.create_child_ports(dvs, p, num_child_ports)
 
 
