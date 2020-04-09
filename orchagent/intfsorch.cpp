@@ -56,7 +56,7 @@ IntfsOrch::IntfsOrch(DBConnector *db, string tableName, VRFOrch *vrf_orch) :
 {
     SWSS_LOG_ENTER();
 
-    /* Initialize DB connectors */ 
+    /* Initialize DB connectors */
     m_counter_db = shared_ptr<DBConnector>(new DBConnector("COUNTERS_DB", 0));
     m_flex_db = shared_ptr<DBConnector>(new DBConnector("FLEX_COUNTER_DB", 0));
     m_asic_db = shared_ptr<DBConnector>(new DBConnector("ASIC_DB", 0));
