@@ -77,6 +77,8 @@ public:
     bool                m_autoneg = false;
     bool                m_admin_state_up = false;
     bool                m_init = false;
+    bool                m_isPortQueueMapGenerated = false;
+    bool                m_isPortPriorityGroupMapGenerated = false;
     sai_object_id_t     m_port_id = 0;
     sai_port_fec_mode_t m_fec_mode = SAI_PORT_FEC_MODE_NONE;
     VlanInfo            m_vlan_info;
@@ -112,7 +114,6 @@ public:
      */
     std::vector<bool> m_queue_lock;
     std::vector<bool> m_priority_group_lock;
-
 };
 
 }
