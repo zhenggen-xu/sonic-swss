@@ -1678,7 +1678,7 @@ bool PortsOrch::initPort(const string &alias, const set<int> &lane_set)
     return true;
 }
 
-void PortsOrch::deinitport(const Port& p)
+void PortsOrch::deinitport(Port& p)
 {
     SWSS_LOG_ENTER();
 
@@ -1690,13 +1690,19 @@ void PortsOrch::deinitport(const Port& p)
     redisClient.hdel(COUNTERS_PORT_NAME_MAP, pAlias);
 
     // Destroy port's queue and PG flex stat counters
-    destroyQueueMapPerPort(p);
-    destroyPriorityGroupMapPerPort(p);
+    if (p.m_isPortQueueMapGenerated)
+    {
+        destroyQueueMapPerPort(p);
+    }
+
+    if (p.m_isPortPriorityGroupMapGenerated)
+    {
+        destroyPriorityGroupMapPerPort(p);
+    }
 
     /* remove port from flex_counter for updating stat counters  */
     string key = getPortFlexCounterTableKey(sai_serialize_object_id(pOID));
     m_flexCounterTable->del(key);
-
 
     SWSS_LOG_NOTICE("De-Initialized port %s, OID:0x%" PRIx64 ".", pAlias.c_str(), pOID);
 }
@@ -2959,18 +2965,32 @@ bool PortsOrch::initializePort(Port &port)
 
     initializePriorityGroups(port);
     initializeQueues(port);
-    if (m_isQueueMapGenerated)
+    if (m_isQueueMapGenerated && !port.m_isPortQueueMapGenerated)
     {
-        // We need to know if this port is being created as a initialzation step
-        // or as a result of dynamic port breakout. Because, during initialization
-        // QueueMap for each port is generated when flexPortOrch calls
-        // generateQueueMap. And these queueMaps of a port are deleted when port is
-        // deleted (This is debatable). So, we re-creating here when the port is
-        // re-created.
+        //------------------------------------------------------------
+        // m_isQueueMapGenerated | m_isPortQueueMapGenerated | Action |
+        //------------------------------------------------------------
+        //     FALSE             |         FALSE             |  A1    |
+        //------------------------------------------------------------
+        //     FALSE             |         TRUE              |  A2    |
+        //------------------------------------------------------------
+        //     TRUE              |         FALSE             |  A3    |
+        //------------------------------------------------------------
+        //     TRUE              |         TRUE              |  A4    |
+        //------------------------------------------------------------
+        // A1 -> No flex group is configured, flexCounterOrch did NOT request to generate
+        //       QueueMap for any port, so lets NOT do it.
+        // A2 -> This should never happen
+        // A3 -> flexCounterOrch has already requested to genreate QueueMap for all ports.
+        //       We deleted the port as part of dynamic port breakout and re-creating it.
+        //       Lets generate it now.
+        // A4 -> flexCounterOrch has already requested to genreate QueueMap for all ports.
+        //        And we have done so.
         generateQueueMapPerPort(port);
     }
 
-    if (m_isPriorityGroupMapGenerated)
+    if (m_isPriorityGroupMapGenerated &&
+        !port.m_isPortPriorityGroupMapGenerated)
     {
         // Similar comment as that for queueMap above.
         generatePriorityGroupMapPerPort(port);
@@ -3672,7 +3692,7 @@ void PortsOrch::generateQueueMap()
         return;
     }
 
-    for (const auto& it: m_portList)
+    for (auto& it: m_portList)
     {
         if (it.second.m_type == Port::PHY)
         {
@@ -3683,7 +3703,7 @@ void PortsOrch::generateQueueMap()
     m_isQueueMapGenerated = true;
 }
 
-void PortsOrch::generateQueueMapPerPort(const Port& port)
+void PortsOrch::generateQueueMapPerPort(Port& port)
 {
     /* Create the Queue map in the Counter DB */
     /* Add stat counters to flex_counter */
@@ -3749,9 +3769,10 @@ void PortsOrch::generateQueueMapPerPort(const Port& port)
     m_queueTypeTable->set("", queueTypeVector);
 
     CounterCheckOrch::getInstance().addPort(port);
+    port.m_isPortQueueMapGenerated = true;
 }
 
-void PortsOrch::destroyQueueMapPerPort(const Port& port)
+void PortsOrch::destroyQueueMapPerPort(Port& port)
 {
     for (size_t qIndex = 0; qIndex < port.m_queue_ids.size(); ++qIndex)
     {
@@ -3772,6 +3793,7 @@ void PortsOrch::destroyQueueMapPerPort(const Port& port)
         m_flexCounterTable->del(key);
     }
     CounterCheckOrch::getInstance().removePort(port);
+    port.m_isPortQueueMapGenerated = false;
 }
 
 void PortsOrch::generatePriorityGroupMap()
@@ -3781,7 +3803,7 @@ void PortsOrch::generatePriorityGroupMap()
         return;
     }
 
-    for (const auto& it: m_portList)
+    for (auto& it: m_portList)
     {
         if (it.second.m_type == Port::PHY)
         {
@@ -3792,7 +3814,7 @@ void PortsOrch::generatePriorityGroupMap()
     m_isPriorityGroupMapGenerated = true;
 }
 
-void PortsOrch::generatePriorityGroupMapPerPort(const Port& port)
+void PortsOrch::generatePriorityGroupMapPerPort(Port& port)
 {
     /* Create the PG map in the Counter DB */
     /* Add stat counters to flex_counter */
@@ -3833,9 +3855,10 @@ void PortsOrch::generatePriorityGroupMapPerPort(const Port& port)
     m_pgIndexTable->set("", pgIndexVector);
 
     CounterCheckOrch::getInstance().addPort(port);
+    port.m_isPortPriorityGroupMapGenerated = true;
 }
 
-void PortsOrch::destroyPriorityGroupMapPerPort(const Port& port)
+void PortsOrch::destroyPriorityGroupMapPerPort(Port& port)
 {
     for (size_t pgIndex = 0; pgIndex < port.m_priority_group_ids.size(); ++pgIndex)
     {
@@ -3851,6 +3874,7 @@ void PortsOrch::destroyPriorityGroupMapPerPort(const Port& port)
         m_flexCounterTable->del(key);
     }
     CounterCheckOrch::getInstance().removePort(port);
+    port.m_isPortPriorityGroupMapGenerated = false;
 }
 
 void PortsOrch::doTask(NotificationConsumer &consumer)

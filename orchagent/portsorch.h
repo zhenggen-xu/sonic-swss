@@ -194,7 +194,7 @@ private:
     bool addPort(const set<int> &lane_set, uint32_t speed, int an=0, string fec="");
     bool removePort(sai_object_id_t port_id);
     bool initPort(const string &alias, const set<int> &lane_set);
-    void deinitport(const Port&);
+    void deinitport(Port&);
     void flush();
 
     bool setPortAdminStatus(sai_object_id_t id, bool up);
@@ -216,12 +216,12 @@ private:
     bool getQueueTypeAndIndex(sai_object_id_t queue_id, string &type, uint8_t &index);
 
     bool m_isQueueMapGenerated = false;
-    void generateQueueMapPerPort(const Port& port);
-    void destroyQueueMapPerPort(const Port& port);
+    void generateQueueMapPerPort(Port& port);
+    void destroyQueueMapPerPort(Port& port);
 
     bool m_isPriorityGroupMapGenerated = false;
-    void generatePriorityGroupMapPerPort(const Port& port);
-    void destroyPriorityGroupMapPerPort(const Port& port);
+    void generatePriorityGroupMapPerPort(Port& port);
+    void destroyPriorityGroupMapPerPort(Port& port);
 
     bool setPortAutoNeg(sai_object_id_t id, int an);
     bool setPortFecMode(sai_object_id_t id, int fec);
