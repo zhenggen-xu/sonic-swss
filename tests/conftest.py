@@ -1003,6 +1003,14 @@ class DockerVirtualSwitch(object):
 
         return self.state_db
 
+    def get_dvs_acl(self):
+        if not self.dvs_acl:
+            self.dvs_acl = dvs_acl.DVSAcl(self.get_asic_db(),
+                                          self.get_config_db(),
+                                          self.get_state_db(),
+                                          self.get_counters_db())
+        return self.dvs_acl
+
     def change_port_breakout_mode(self, intf_name, target_mode):
         cmd = "config interface breakout %s %s -y"%(intf_name, target_mode)
         self.runcmd(cmd)
@@ -1035,6 +1043,13 @@ def testlog(request, dvs):
     dvs.runcmd("logger === start test %s ===" % request.node.name)
     yield testlog
     dvs.runcmd("logger === finish test %s ===" % request.node.name)
+
+@pytest.yield_fixture(scope="class")
+def dvs_acl_manager(request, dvs):
+    request.cls.dvs_acl = dvs_acl.DVSAcl(dvs.get_asic_db(),
+                                         dvs.get_config_db(),
+                                         dvs.get_state_db(),
+                                         dvs.get_counters_db())
 
 ##################### DPB fixtures ###########################################
 @pytest.yield_fixture(scope="module")
