@@ -13,6 +13,9 @@ import subprocess
 from datetime import datetime
 from swsscommon import swsscommon
 
+from dvslib import dvs_database as dvs_db
+from dvslib import dvs_acl
+
 def ensure_system(cmd):
     rc = os.WEXITSTATUS(os.system(cmd))
     if rc:
@@ -144,6 +147,13 @@ class VirtualServer(object):
         return subprocess.check_output("ip netns exec %s %s" % (self.nsname, cmd), shell=True)
 
 class DockerVirtualSwitch(object):
+    APP_DB_ID = 0
+    ASIC_DB_ID = 1
+    COUNTERS_DB_ID = 2
+    CONFIG_DB_ID = 4
+    FLEX_COUNTER_DB_ID = 5
+    STATE_DB_ID = 6
+
     def __init__(self, name=None, imgname=None, keeptb=False, fakeplatform=None):
         self.basicd = ['redis-server',
                        'rsyslogd']
@@ -225,6 +235,14 @@ class DockerVirtualSwitch(object):
 
         self.redis_sock = self.mount + '/' + "redis.sock"
         self.check_ctn_status_and_db_connect()
+
+        # DB wrappers are declared here, lazy-loaded in the tests
+        self.app_db = None
+        self.asic_db = None
+        self.counters_db = None
+        self.config_db = None
+        self.flex_db = None
+        self.state_db = None
 
     def destroy(self):
         if self.appldb:
@@ -942,6 +960,57 @@ class DockerVirtualSwitch(object):
         acl_table_groups = atbl.getKeys()
         assert len(acl_table_groups) == len(bind_ports)
 
+    def get_app_db(self):
+        if not self.app_db:
+            self.app_db = dvs_db.DVSDatabase(self.APP_DB_ID, self.redis_sock)
+
+        return self.app_db
+
+    def get_asic_db(self):
+        if not self.asic_db:
+            db = dvs_db.DVSDatabase(self.ASIC_DB_ID, self.redis_sock)
+            db.default_acl_tables = self.asicdb.default_acl_tables
+            db.default_acl_entries = self.asicdb.default_acl_entries
+            db.port_name_map = self.asicdb.portnamemap
+            db.default_vlan_id = self.asicdb.default_vlan_id
+            db.port_to_id_map = self.asicdb.portoidmap
+            db.hostif_name_map = self.asicdb.hostifnamemap
+            self.asic_db = db
+
+        return self.asic_db
+
+    def get_counters_db(self):
+        if not self.counters_db:
+            self.counters_db = dvs_db.DVSDatabase(self.COUNTERS_DB_ID, self.redis_sock)
+
+        return self.counters_db
+
+    def get_config_db(self):
+        if not self.config_db:
+            self.config_db = dvs_db.DVSDatabase(self.CONFIG_DB_ID, self.redis_sock)
+
+        return self.config_db
+
+    def get_flex_db(self):
+        if not self.flex_db:
+            self.flex_db = dvs_db.DVSDatabase(self.FLEX_COUNTER_DB_ID, self.redis_sock)
+
+        return self.flex_db
+
+    def get_state_db(self):
+        if not self.state_db:
+            self.state_db = dvs_db.DVSDatabase(self.STATE_DB_ID, self.redis_sock)
+
+        return self.state_db
+
+    def get_dvs_acl(self):
+        if not self.dvs_acl:
+            self.dvs_acl = dvs_acl.DVSAcl(self.get_asic_db(),
+                                          self.get_config_db(),
+                                          self.get_state_db(),
+                                          self.get_counters_db())
+        return self.dvs_acl
+
     def change_port_breakout_mode(self, intf_name, target_mode):
         cmd = "config interface breakout %s %s -y"%(intf_name, target_mode)
         self.runcmd(cmd)
@@ -974,6 +1043,13 @@ def testlog(request, dvs):
     dvs.runcmd("logger === start test %s ===" % request.node.name)
     yield testlog
     dvs.runcmd("logger === finish test %s ===" % request.node.name)
+
+@pytest.yield_fixture(scope="class")
+def dvs_acl_manager(request, dvs):
+    request.cls.dvs_acl = dvs_acl.DVSAcl(dvs.get_asic_db(),
+                                         dvs.get_config_db(),
+                                         dvs.get_state_db(),
+                                         dvs.get_counters_db())
 
 ##################### DPB fixtures ###########################################
 @pytest.yield_fixture(scope="module")
