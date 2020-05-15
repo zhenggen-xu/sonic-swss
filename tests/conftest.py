@@ -1011,8 +1011,8 @@ class DockerVirtualSwitch(object):
                                           self.get_counters_db())
         return self.dvs_acl
 
-    def change_port_breakout_mode(self, intf_name, target_mode):
-        cmd = "config interface breakout %s %s -y"%(intf_name, target_mode)
+    def change_port_breakout_mode(self, intf_name, target_mode, options=""):
+        cmd = "config interface breakout %s %s -y %s"%(intf_name, target_mode, options)
         self.runcmd(cmd)
         time.sleep(2)
 
