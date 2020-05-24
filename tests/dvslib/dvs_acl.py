@@ -6,10 +6,11 @@ class DVSAcl(object):
         self.counters_db = cntrdb
 
     def create_acl_table(self, table_name, table_type, ports, stage=None):
+
         table_attrs = {
             "policy_desc": "DVS acl table test",
             "type": table_type,
-            "ports": ",".join(ports)
+            "ports@": ",".join(ports)
         }
 
         if stage:
@@ -18,8 +19,9 @@ class DVSAcl(object):
         self.config_db.create_entry("ACL_TABLE", table_name, table_attrs)
 
     def update_acl_table(self, acl_table_name, ports):
+
         table_attrs = {
-            "ports": ",".join(ports)
+            "ports@": ",".join(ports)
         }
         self.config_db.update_entry("ACL_TABLE", acl_table_name, table_attrs)
 

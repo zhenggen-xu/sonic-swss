@@ -84,7 +84,6 @@ class TestPortDPBAcl(object):
         self.dvs_acl.verify_acl_group_num(2)
         acl_table_ids = self.dvs_acl.get_acl_table_ids()
         self.dvs_acl.verify_acl_table_ports_binding(bind_ports, acl_table_ids[0])
-
         # Update bind list and verify
         bind_ports = ["Ethernet4"]
         self.dvs_acl.update_acl_table("test", bind_ports)
