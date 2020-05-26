@@ -4120,17 +4120,17 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
     vector<sai_attribute_t> attrs;
     sai_status_t rv;
 
-    // If bridge port ID and bvis both are are NOT specified,
+    // If bridge port ID and bvid both are are NOT specified,
     // SAI REDIS will flush all FDB entries. This function is meant
     // to delete passed in bridge_port_id's FDB entries only.
-    // Hence bridge_port_id cannot SAI_NULL_OBJECT_ID.
+    // Hence bridge_port_id cannot be SAI_NULL_OBJECT_ID.
     if (SAI_NULL_OBJECT_ID == bridge_port_id)
     {
         SWSS_LOG_WARN("NOT flushing FDB entries as bridge port ID:0x0");
         return;
     }
 
-    SWSS_LOG_INFO("Flushing the port with bridge port id: %" PRIx64, bridge_port_id);
+    SWSS_LOG_INFO("Flushing FDB entry with bridge port id: %" PRIx64, bridge_port_id);
     attr.id = SAI_FDB_FLUSH_ATTR_BRIDGE_PORT_ID;
     attr.value.oid = bridge_port_id;
     attrs.push_back(attr);

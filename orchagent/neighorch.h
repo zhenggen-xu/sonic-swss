@@ -37,7 +37,7 @@ struct NeighborUpdate
 class NeighOrch : public Orch, public Subject, public Observer
 {
 public:
-    NeighOrch(DBConnector *db, string tableName, IntfsOrch *intfsOrch, FdbOrch *fdbOrch);
+    NeighOrch(DBConnector *db, string tableName, IntfsOrch *intfsOrch, FdbOrch *fdbOrch, PortsOrch *portsOrch);
     ~NeighOrch();
 
     bool hasNextHop(const NextHopKey&);
@@ -57,6 +57,7 @@ public:
     void update(SubjectType, void *);
 
 private:
+    PortsOrch *m_portsOrch;
     IntfsOrch *m_intfsOrch;
     FdbOrch *m_fdbOrch;
     struct nl_sock *m_nl_sock;
@@ -74,6 +75,7 @@ private:
     bool clearNextHopFlag(const NextHopKey &, const uint32_t);
 
     bool processFDBUpdate(const FdbUpdate &);
+    bool processPortUpdate(const PortUpdate &);
     bool flushNeighborEntry(const NeighborEntry &, const MacAddress &);
 
     void doTask(Consumer &consumer);

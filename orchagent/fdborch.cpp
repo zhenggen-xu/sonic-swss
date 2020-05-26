@@ -119,6 +119,15 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
     update.entry.mac = entry->mac_address;
     update.entry.bv_id = entry->bv_id;
 
+    SWSS_LOG_NOTICE("FDB event:%d, MAC: %s , BVID: 0x%" PRIx64 " , bridge port ID: 0x%" PRIx64 ".", 
+                    type, update.entry.mac.to_string().c_str(), entry->bv_id, bridge_port_id);
+
+    if (bridge_port_id && !m_portsOrch->getPortByBridgePortId(bridge_port_id, update.port))
+    {
+        SWSS_LOG_ERROR("Failed to get port by bridge port ID 0x%" PRIx64, bridge_port_id);
+        return;
+    }
+
     switch (type)
     {
     case SAI_FDB_EVENT_LEARNED:
@@ -151,6 +160,7 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
         update.add = false;
         storeFdbEntryState(update);
 
+        SWSS_LOG_NOTICE("Notifying observers of FDB entry removal on AGED/MOVED");
         for (auto observer: m_observers)
         {
             observer->update(SUBJECT_TYPE_FDB_CHANGE, &update);
@@ -159,9 +169,15 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
         break;
 
     case SAI_FDB_EVENT_FLUSHED:
-        if ((bridge_port_id == SAI_NULL_OBJECT_ID && entry->bv_id == SAI_NULL_OBJECT_ID)
-            || (bridge_port_id && entry->bv_id == SAI_NULL_OBJECT_ID))
+
+        SWSS_LOG_NOTICE("FDB Flush event received: [ %s , 0x%" PRIx64 " ], bridge port ID: 0x%" PRIx64 ".", 
+                        update.entry.mac.to_string().c_str(), entry->bv_id, bridge_port_id);
+        
+        if (bridge_port_id == SAI_NULL_OBJECT_ID && entry->bv_id == SAI_NULL_OBJECT_ID)
         {
+            SWSS_LOG_NOTICE("FDB Flushed: [ %s , - ] = { port: - }",
+                            update.entry.mac.to_string().c_str());
+            
             for (auto itr = m_entries.begin(); itr != m_entries.end();)
             {
                 /*
@@ -177,8 +193,7 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
 
                 storeFdbEntryState(update);
 
-                SWSS_LOG_DEBUG("FdbOrch notification: mac %s was removed", update.entry.mac.to_string().c_str());
-
+                SWSS_LOG_NOTICE("Notifying observers of FDB entry removal");
                 for (auto observer: m_observers)
                 {
                     observer->update(SUBJECT_TYPE_FDB_CHANGE, &update);
@@ -187,13 +202,26 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
         }
         else if (bridge_port_id && entry->bv_id == SAI_NULL_OBJECT_ID)
         {
-            /*this is a placeholder for flush port fdb case, not supported yet.*/
-            SWSS_LOG_ERROR("FdbOrch notification: not supported flush port fdb action, port_id = 0x%" PRIx64 ", bv_id = 0x%" PRIx64 ".", bridge_port_id, entry->bv_id);
+            if (!m_portsOrch->getPortByBridgePortId(bridge_port_id, update.port))
+            {
+                SWSS_LOG_ERROR("Failed to get port by bridge port ID 0x%" PRIx64, bridge_port_id);
+                return;
+            }
+            SWSS_LOG_NOTICE("FDB Flushed: [ %s , - ] = { port: %s }",
+                            update.entry.mac.to_string().c_str(), update.port.m_alias.c_str());
         }
         else if (bridge_port_id == SAI_NULL_OBJECT_ID && entry->bv_id != SAI_NULL_OBJECT_ID)
         {
-            /*this is a placeholder for flush vlan fdb case, not supported yet.*/
-            SWSS_LOG_ERROR("FdbOrch notification: not supported flush vlan fdb action, port_id = 0x%" PRIx64 ", bv_id = 0x%" PRIx64 ".", bridge_port_id, entry->bv_id);
+            Port vlan;
+
+            if (!m_portsOrch->getPort(entry->bv_id, vlan))
+            {
+                SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate vlan port from bv_id 0x%" PRIx64, entry->bv_id);
+                return;
+            }
+            string vlanName = "Vlan" + to_string(vlan.m_vlan_info.vlan_id);
+            SWSS_LOG_NOTICE("FDB Flushed: [ %s , %s ] = { port: - }",
+                            update.entry.mac.to_string().c_str(), vlanName.c_str());
         }
         else
         {
@@ -579,6 +607,7 @@ bool FdbOrch::removeFdbEntry(const FdbEntry& entry)
     Port port;
     m_portsOrch->getPortByBridgePortId(entry.bv_id, port);
 
+    SWSS_LOG_NOTICE("Notifying observers of FDB entry removal");
     FdbUpdate update = {entry, port, false};
     for (auto observer: m_observers)
     {

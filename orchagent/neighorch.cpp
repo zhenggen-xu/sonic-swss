@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <inttypes.h>
 
 #include "neighorch.h"
 #include "logger.h"
@@ -36,14 +37,15 @@ static bool send_message(struct nl_sock *socket_p, struct nl_msg *msg_p)
     return true;
 }
 
-NeighOrch::NeighOrch(DBConnector *db, string tableName, IntfsOrch *intfsOrch, FdbOrch *fdbOrch) :
-        Orch(db, tableName, neighorch_pri), m_intfsOrch(intfsOrch), m_fdbOrch(fdbOrch)
+NeighOrch::NeighOrch(DBConnector *db, string tableName, IntfsOrch *intfsOrch, FdbOrch *fdbOrch, PortsOrch *portsOrch) :
+        Orch(db, tableName, neighorch_pri), m_intfsOrch(intfsOrch), m_fdbOrch(fdbOrch), m_portsOrch(portsOrch)
 {
     int err = 0;
 
     SWSS_LOG_ENTER();
 
     m_fdbOrch->attach(this);
+    gPortsOrch->attach(this);
 
     m_nl_sock = nl_socket_alloc();
     if (!m_nl_sock)
@@ -166,7 +168,19 @@ bool NeighOrch::flushNeighborEntry(const NeighborEntry &entry, const MacAddress 
 
     return send_message(m_nl_sock, msg_p);
 }
-
+/*
+ * Function Name: processFDBUpdate
+ * Description: Goal of this function is to delete neighbor/ARP entries
+ *              when a port belonging to a VLAN gets deleted. 
+ *              This function is called whenever neighbor orchagent receives
+ *              SUBJECT_TYPE_FDB_CHANGE notification. Currently we only care for
+ *              deleted FDB entries. We flush neighbor entry that matches its
+ *              in-coming interface and MAC with FDB entry's VLAN name and MAC
+ *              respectively. Also this ensures that underlying physical port is
+ *              being deleted by checking its init status.
+ * IN parameters: FdbUpdate
+ * Returns: true if successfully flushes any ARP entry, false otherwise.
+ */
 bool NeighOrch::processFDBUpdate(const FdbUpdate& update)
 {
     MacAddress fdbEntryMac = update.entry.mac;
@@ -177,16 +191,61 @@ bool NeighOrch::processFDBUpdate(const FdbUpdate& update)
         return true;
     }
 
-    // If the FDB entry MAC matches with neighbor/arp entry MAC,
+    SWSS_LOG_NOTICE("Received FDB update, Flushing all ARP entries with matching MAC");
+
+    // Get Vlan object
+    Port vlan;
+    if (!m_portsOrch->getPort(update.entry.bv_id, vlan))
+    {
+        SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate vlan port from bv_id 0x%" PRIx64 ".", update.entry.bv_id);
+        return false;
+    }
+
+    if (update.port.m_admin_state_up)
+    {
+        
+        SWSS_LOG_NOTICE("port %s is admin UP. Could be an AGED entry. Dont flush ARP.", update.port.m_alias.c_str());
+        return false;
+    }
+
+    // If the FDB entry MAC matches with neighbor/ARP entry MAC,
+    // and ARP entry incoming interface matches with VLAN name,
     // flush neighbor/arp entry.
     for (const auto &entry : m_syncdNeighbors)
     {
-        if (entry.second == fdbEntryMac)
+        if (entry.first.alias == vlan.m_alias && entry.second == fdbEntryMac)
         {
             return flushNeighborEntry(entry.first, entry.second);
         }
     }
     return true;
+}
+
+bool NeighOrch::processPortUpdate(const PortUpdate& update)
+{
+    if (update.add)
+    {
+        // Not interested in port add
+        return true;
+    }
+
+    const Port &port = update.port;
+
+    SWSS_LOG_NOTICE("Flushing all ARP entries resolved over interface %s",
+                   port.m_alias.c_str());
+
+    for (const auto &entry : m_syncdNeighbors)
+    {
+        SWSS_LOG_NOTICE("Looking at ARP entry <%s, %s>",
+                        entry.first.ip_address.to_string().c_str(),
+                        entry.first.alias.c_str());
+        if (entry.first.alias == port.m_alias)
+        {
+            return flushNeighborEntry(entry.first, entry.second);
+        }
+    }
+    return true;
+   
 }
 
 void NeighOrch::update(SubjectType type, void *cntx)
@@ -200,6 +259,12 @@ void NeighOrch::update(SubjectType type, void *cntx)
         {
             FdbUpdate *update = reinterpret_cast<FdbUpdate *>(cntx);
             processFDBUpdate(*update);
+            break;
+        }
+        case SUBJECT_TYPE_PORT_CHANGE:
+        {
+            PortUpdate *update = reinterpret_cast<PortUpdate *>(cntx);
+            processPortUpdate(*update);
             break;
         }
         default:
