@@ -167,9 +167,7 @@ class TestPortDPBSystem(object):
         self.verify_only_ports_exist(dvs, ["Ethernet0"])
         print "**** 2x25G(2)+1x50G(2) --> 1x100G passed ****"
 
-    '''
     @pytest.mark.skip()
-    '''
     def test_port_breakout_with_acl(self, dvs):
         dvs.setup_db()
         dpb = DPB()
@@ -226,5 +224,94 @@ class TestPortDPBSystem(object):
         self.dvs_acl.verify_acl_table_count(0)
 
     def test_dpb_arp_flush(self, dvs):
- 
+        dvs.setup_db()
+        self.setup_db(dvs);
+
+        self.clear_srv_config(dvs)
+
+        # Create l3 interface
+        rif_oid = self.create_l3_intf("Ethernet0", "")
+
+        # set ip address
+        self.add_ip_address("Ethernet0", "10.0.0.0/31")
+
+        # bring up interface
+        self.set_admin_status("Ethernet0", "up")
+
+        # Set IP address and default route
+        dvs.servers[0].runcmd("ip address add 10.0.0.1/31 dev eth0")
+        dvs.servers[0].runcmd("ip route add default via 10.0.0.0")
+
+        # Get neighbor and ARP entry
+        dvs.servers[0].runcmd("ping -c 1 10.0.0.0")
+
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY")
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 1
+        route = json.loads(intf_entries[0])
+        assert route["ip"] == "10.0.0.1"
+        assert route["rif"] == rif_oid
+        (status, fvs) = tbl.get(intf_entries[0])
+        assert status == True
+
+        fvs_dict = dict(fvs)
+        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == "46:C1:84:2C:3B:4A"
+
+        # Breakout port and make sure NEIGHBOR entry is removed
+        dvs.verify_port_breakout_mode("Ethernet0", "1x100G[40G]")
+        dvs.change_port_breakout_mode("Ethernet0", "4x25G[10G]", "-f")
+        dvs.verify_port_breakout_mode("Ethernet0", "4x25G[10G]")
+
+        #Verify ARP/Neighbor entry is removed
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 0
+
+        dvs.change_port_breakout_mode("Ethernet0", "1x100G[40G]")
+        dvs.verify_port_breakout_mode("Ethernet0", "1x100G[40G]")
+
+    """
+    Below utility functions are required by test_dpb_arp_flush
+    TBD: Introduce dvs_neigbor.py function and move these methods to
+         that file. Change the code in test_dpb_arp_flush accordingly.
+    """
+    def setup_db(self, dvs):
+        self.pdb = swsscommon.DBConnector(0, dvs.redis_sock, 0)
+        self.adb = swsscommon.DBConnector(1, dvs.redis_sock, 0)
+        self.cdb = swsscommon.DBConnector(4, dvs.redis_sock, 0)
+
+    def set_admin_status(self, interface, status):
+        tbl = swsscommon.Table(self.cdb, "PORT")
+        fvs = swsscommon.FieldValuePairs([("admin_status", status)])
+        tbl.set(interface, fvs)
+        time.sleep(1)
+
+    def create_l3_intf(self, interface, vrf_name):
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ROUTER_INTERFACE")
+        initial_entries = set(tbl.getKeys())
+
+        tbl = swsscommon.Table(self.cdb, "INTERFACE")
+        if len(vrf_name) == 0:
+            fvs = swsscommon.FieldValuePairs([("NULL", "NULL")])
+        else:
+            fvs = swsscommon.FieldValuePairs([("vrf_name", vrf_name)])
+        tbl.set(interface, fvs)
+        time.sleep(1)
+
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_ROUTER_INTERFACE")
+        current_entries = set(tbl.getKeys())
+        assert len(current_entries - initial_entries) == 1
+        return list(current_entries - initial_entries)[0]
+
+
+    def add_ip_address(self, interface, ip):
+        tbl = swsscommon.Table(self.cdb, "INTERFACE")
+        fvs = swsscommon.FieldValuePairs([("NULL", "NULL")])
+        tbl.set(interface + "|" + ip, fvs)
+        time.sleep(1)
+
+    def clear_srv_config(self, dvs):
+        dvs.servers[0].runcmd("ip address flush dev eth0")
+        dvs.servers[1].runcmd("ip address flush dev eth0")
+        dvs.servers[2].runcmd("ip address flush dev eth0")
+        dvs.servers[3].runcmd("ip address flush dev eth0") 
     
