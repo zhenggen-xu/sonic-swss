@@ -201,7 +201,7 @@ bool NeighOrch::processFDBUpdate(const FdbUpdate& update)
         return false;
     }
 
-    if (update.port.m_admin_state_up)
+    if (update.port.m_admin_state_up || update.port.m_oper_status == SAI_PORT_OPER_STATUS_UP)
     {
         
         SWSS_LOG_NOTICE("port %s is admin UP. Could be an AGED entry. Dont flush ARP.", update.port.m_alias.c_str());
