@@ -169,56 +169,58 @@ bool NeighOrch::flushNeighborEntry(const NeighborEntry &entry, const MacAddress 
     return send_message(m_nl_sock, msg_p);
 }
 /*
- * Function Name: processFDBUpdate
- * Description: Goal of this function is to delete neighbor/ARP entries
- *              when a port belonging to a VLAN gets deleted. 
- *              This function is called whenever neighbor orchagent receives
- *              SUBJECT_TYPE_FDB_CHANGE notification. Currently we only care for
- *              deleted FDB entries. We flush neighbor entry that matches its
- *              in-coming interface and MAC with FDB entry's VLAN name and MAC
- *              respectively. Also this ensures that underlying physical port is
- *              being deleted by checking its init status.
- * IN parameters: FdbUpdate
- * Returns: true if successfully flushes any ARP entry, false otherwise.
+ * Function Name: processFDBFlushUpdate
+ * Description:
+ *     Goal of this function is to delete neighbor/ARP entries
+ * when a port belonging to a VLAN gets removed.
+ * This function is called whenever neighbor orchagent receives
+ * SUBJECT_TYPE_FDB_FLUSH_CHANGE notification. Currently we only care for
+ * deleted FDB entries. We flush neighbor entry that matches its
+ * in-coming interface and MAC with FDB entry's VLAN name and MAC
+ * respectively. Also this ensures that underlying physical port operation
+ * status or admin state is DOWN.
  */
-bool NeighOrch::processFDBUpdate(const FdbUpdate& update)
+void NeighOrch::processFDBFlushUpdate(const FdbFlushUpdate& update)
 {
-    MacAddress fdbEntryMac = update.entry.mac;
+    SWSS_LOG_NOTICE("processFDBFlushUpdate port: %s",
+                    update.port.m_alias.c_str());
 
-    if (update.add)
+    if (update.port.m_admin_state_up == true &&
+        update.port.m_oper_status == SAI_PORT_OPER_STATUS_UP)
     {
-        // For now we are interested only in deleted FDB entries
-        return true;
+        return;
     }
 
-    SWSS_LOG_NOTICE("Received FDB update, Flushing all ARP entries with matching MAC");
-
-    // Get Vlan object
-    Port vlan;
-    if (!m_portsOrch->getPort(update.entry.bv_id, vlan))
+    for (auto entry : update.entries)
     {
-        SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate vlan port from bv_id 0x%" PRIx64 ".", update.entry.bv_id);
-        return false;
-    }
-
-    if (update.port.m_admin_state_up || update.port.m_oper_status == SAI_PORT_OPER_STATUS_UP)
-    {
-        
-        SWSS_LOG_NOTICE("port %s is admin UP. Could be an AGED entry. Dont flush ARP.", update.port.m_alias.c_str());
-        return false;
-    }
-
-    // If the FDB entry MAC matches with neighbor/ARP entry MAC,
-    // and ARP entry incoming interface matches with VLAN name,
-    // flush neighbor/arp entry.
-    for (const auto &entry : m_syncdNeighbors)
-    {
-        if (entry.first.alias == vlan.m_alias && entry.second == fdbEntryMac)
+        // Get Vlan object
+        Port vlan;
+        if (!m_portsOrch->getPort(entry.bv_id, vlan))
         {
-            return flushNeighborEntry(entry.first, entry.second);
+            SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate vlan port \
+                             from bv_id 0x%" PRIx64 ".", entry.bv_id);
+            continue;
+        }
+        SWSS_LOG_INFO("Flushing ARP for port: %s, VLAN: %s",
+                      vlan.m_alias.c_str(), update.port.m_alias.c_str());
+
+        // If the FDB entry MAC matches with neighbor/ARP entry MAC,
+        // and ARP entry incoming interface matches with VLAN name,
+        // flush neighbor/arp entry.
+        for (const auto &neighborEntry : m_syncdNeighbors)
+        {
+            if (neighborEntry.first.alias == vlan.m_alias &&
+                neighborEntry.second == entry.mac)
+            {
+                SWSS_LOG_INFO("Flushing ARP [ %s , %s ] = [ port: %s ]",
+                               vlan.m_alias.c_str(),
+                               entry.mac.to_string().c_str(),
+                               update.port.m_alias.c_str());
+                flushNeighborEntry(neighborEntry.first, neighborEntry.second);
+            }
         }
     }
-    return true;
+    return;
 }
 
 bool NeighOrch::processPortUpdate(const PortUpdate& update)
@@ -255,10 +257,10 @@ void NeighOrch::update(SubjectType type, void *cntx)
     assert(cntx);
 
     switch(type) {
-        case SUBJECT_TYPE_FDB_CHANGE:
+        case SUBJECT_TYPE_FDB_FLUSH_CHANGE:
         {
-            FdbUpdate *update = reinterpret_cast<FdbUpdate *>(cntx);
-            processFDBUpdate(*update);
+            FdbFlushUpdate *update = reinterpret_cast<FdbFlushUpdate *>(cntx);
+            processFDBFlushUpdate(*update);
             break;
         }
         case SUBJECT_TYPE_PORT_CHANGE:

@@ -54,9 +54,9 @@ bool FdbOrch::bake()
     return true;
 }
 
-bool FdbOrch::storeFdbEntryState(const FdbUpdate& update)
+bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
 {
-    const FdbEntry& entry = update.entry;
+    FdbEntry& entry = update.entry;
     const Port& port = update.port;
     const MacAddress& mac = entry.mac;
     string portName = port.m_alias;
@@ -64,7 +64,8 @@ bool FdbOrch::storeFdbEntryState(const FdbUpdate& update)
 
     if (!m_portsOrch->getPort(entry.bv_id, vlan))
     {
-        SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate vlan port from bv_id 0x%" PRIx64, entry.bv_id);
+        SWSS_LOG_NOTICE("FdbOrch notification: Failed to locate \
+                         vlan port from bv_id 0x%" PRIx64, entry.bv_id);
         return false;
     }
 
@@ -73,10 +74,11 @@ bool FdbOrch::storeFdbEntryState(const FdbUpdate& update)
 
     if (update.add)
     {
+        entry.port_name = portName;
+        SWSS_LOG_INFO("Storing FDB entry: [%s, 0x%" PRIx64 "] [ port: %s ]",
+                      entry.mac.to_string().c_str(),
+                      entry.bv_id, entry.port_name.c_str());
         auto inserted = m_entries.insert(entry);
-
-        SWSS_LOG_DEBUG("FdbOrch notification: mac %s was inserted into bv_id 0x%" PRIx64,
-                        entry.mac.to_string().c_str(), entry.bv_id);
 
         if (!inserted.second)
         {
@@ -342,6 +344,7 @@ void FdbOrch::doTask(Consumer& consumer)
                 }
             }
 
+            entry.port_name = port;
             /* FDB type is either dynamic or static */
             assert(type == "dynamic" || type == "static");
 
@@ -485,15 +488,46 @@ void FdbOrch::flushFDBEntries(sai_object_id_t bridge_port_oid,
     }
 }
 
+void FdbOrch::notifyObserversFDBFlush(Port &port, sai_object_id_t& bvid)
+
+{
+    FdbFlushUpdate flushUpdate;
+    flushUpdate.port = port;
+
+    for (auto itr = m_entries.begin(); itr != m_entries.end(); ++itr)
+    {
+        if ((itr->port_name == port.m_alias) && 
+            (itr->bv_id == bvid))
+        {
+            SWSS_LOG_INFO("Adding MAC learnt on [ port:%s , bvid:0x%" PRIx64 "]\
+                           to ARP flush", port.m_alias.c_str(), bvid);
+            FdbEntry entry;
+            entry.mac = itr->mac;
+            entry.bv_id = itr->bv_id;
+            flushUpdate.entries.push_back(entry);
+        }
+    }
+
+    if (!flushUpdate.entries.empty())
+    {
+        for (auto observer: m_observers)
+        {
+            observer->update(SUBJECT_TYPE_FDB_FLUSH_CHANGE, &flushUpdate);
+        }
+    }
+}
+
 void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
 {
     SWSS_LOG_ENTER();
 
     if (!update.add)
     {
+        SWSS_LOG_ERROR("Vasant: updateVlanMember");
         swss::Port vlan = update.vlan;
         swss::Port port = update.member;
         flushFDBEntries(port.m_bridge_port_id, vlan.m_vlan_info.vlan_oid);
+        notifyObserversFDBFlush(port, vlan.m_vlan_info.vlan_oid);
         return;
     }
 
@@ -501,7 +535,7 @@ void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
     auto fdb_list = std::move(saved_fdb_entries[port_name]);
     if(!fdb_list.empty())
     {
-        for (const auto& fdb: fdb_list)
+        for (auto& fdb: fdb_list)
         {
             // try to insert an FDB entry. If the FDB entry is not ready to be inserted yet,
             // it would be added back to the saved_fdb_entries structure by addFDBEntry()
@@ -510,7 +544,7 @@ void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
     }
 }
 
-bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& port_name, const string& type)
+bool FdbOrch::addFdbEntry(FdbEntry& entry, const string& port_name, const string& type)
 {
     SWSS_LOG_ENTER();
 
@@ -537,6 +571,11 @@ bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& port_name, const 
         saved_fdb_entries[port_name].push_back({entry, type});
 
         return true;
+    }
+
+    if (entry.port_name.empty())
+    {
+        entry.port_name = port_name;
     }
 
     sai_attribute_t attr;
@@ -567,8 +606,9 @@ bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& port_name, const 
         return false; //FIXME: it should be based on status. Some could be retried, some not
     }
 
-    SWSS_LOG_NOTICE("Create %s FDB %s on %s", type.c_str(), entry.mac.to_string().c_str(), port_name.c_str());
-
+    SWSS_LOG_NOTICE("Storing FDB entry: [%s, 0x%" PRIx64 "] [ port: %s , type: %s]",
+                    entry.mac.to_string().c_str(),
+                    entry.bv_id, entry.port_name.c_str(), type.c_str());
     (void) m_entries.insert(entry);
 
     gCrmOrch->incCrmResUsedCounter(CrmResourceType::CRM_FDB_ENTRY);

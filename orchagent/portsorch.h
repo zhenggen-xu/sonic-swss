@@ -236,7 +236,7 @@ private:
     bool getSaiAclBindPointType(Port::Type                type,
 		                sai_acl_bind_point_type_t &sai_acl_bind_type);
 
-    void flushFDBEntries(sai_object_id_t bridge_port_id);
+    void flushFDBEntries(Port& port);
 };
 #endif /* SWSS_PORTSORCH_H */
 
