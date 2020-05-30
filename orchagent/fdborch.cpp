@@ -579,8 +579,9 @@ bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& type)
     /* Retry until port is added to the VLAN */
     if (!port.m_bridge_port_id)
     {
-        SWSS_LOG_DEBUG("Saving a fdb entry until port %s has got a bridge port ID", port_name.c_str());
-        saved_fdb_entries[port_name].push_back({entry, type});
+        SWSS_LOG_DEBUG("Saving a fdb entry until port %s has got a bridge port ID", 
+                      entry. port_name.c_str());
+        saved_fdb_entries[entry.port_name].push_back({entry, type});
 
         return true;
     }
@@ -609,7 +610,8 @@ bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& type)
     if (status != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("Failed to create %s FDB %s on %s, rv:%d",
-                type.c_str(), entry.mac.to_string().c_str(), port_name.c_str(), status);
+                type.c_str(), entry.mac.to_string().c_str(),
+                entry.port_name.c_str(), status);
         return false; //FIXME: it should be based on status. Some could be retried, some not
     }
 
