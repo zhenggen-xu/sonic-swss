@@ -57,9 +57,7 @@ bool FdbOrch::bake()
 bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
 {
     FdbEntry& entry = update.entry;
-    const Port& port = update.port;
     const MacAddress& mac = entry.mac;
-    string portName = port.m_alias;
     Port vlan;
 
     if (!m_portsOrch->getPort(entry.bv_id, vlan))
@@ -74,7 +72,6 @@ bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
 
     if (update.add)
     {
-        entry.port_name = portName;
         SWSS_LOG_INFO("Storing FDB entry: [%s, 0x%" PRIx64 "] [ port: %s ]",
                       entry.mac.to_string().c_str(),
                       entry.bv_id, entry.port_name.c_str());
@@ -88,7 +85,7 @@ bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
 
         // Write to StateDb
         std::vector<FieldValueTuple> fvs;
-        fvs.push_back(FieldValueTuple("port", portName));
+        fvs.push_back(FieldValueTuple("port", entry.port_name));
         fvs.push_back(FieldValueTuple("type", "dynamic"));
         m_fdbStateTable.set(key, fvs);
 
@@ -113,7 +110,8 @@ bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
     }
 }
 
-void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_object_id_t bridge_port_id)
+void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, 
+                     sai_object_id_t bridge_port_id)
 {
     SWSS_LOG_ENTER();
 
@@ -152,6 +150,7 @@ void FdbOrch::update(sai_fdb_event_t type, const sai_fdb_entry_t* entry, sai_obj
         }
 
         update.add = true;
+        update.entry.port_name = update.port.m_alias;
         storeFdbEntryState(update);
 
         for (auto observer: m_observers)
@@ -362,7 +361,7 @@ void FdbOrch::doTask(Consumer& consumer)
             /* FDB type is either dynamic or static */
             assert(type == "dynamic" || type == "static");
 
-            if (addFdbEntry(entry, port, type))
+            if (addFdbEntry(entry, type))
                 it = consumer.m_toSync.erase(it);
             else
                 it++;
@@ -537,7 +536,6 @@ void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
 
     if (!update.add)
     {
-        SWSS_LOG_ERROR("Vasant: updateVlanMember");
         swss::Port vlan = update.vlan;
         swss::Port port = update.member;
         flushFDBEntries(port.m_bridge_port_id, vlan.m_vlan_info.vlan_oid);
@@ -549,16 +547,16 @@ void FdbOrch::updateVlanMember(const VlanMemberUpdate& update)
     auto fdb_list = std::move(saved_fdb_entries[port_name]);
     if(!fdb_list.empty())
     {
-        for (auto& fdb: fdb_list)
+        for (const auto& fdb: fdb_list)
         {
             // try to insert an FDB entry. If the FDB entry is not ready to be inserted yet,
             // it would be added back to the saved_fdb_entries structure by addFDBEntry()
-            (void)addFdbEntry(fdb.entry, port_name, fdb.type);
+            (void)addFdbEntry(fdb.entry, fdb.type);
         }
     }
 }
 
-bool FdbOrch::addFdbEntry(FdbEntry& entry, const string& port_name, const string& type)
+bool FdbOrch::addFdbEntry(const FdbEntry& entry, const string& type)
 {
     SWSS_LOG_ENTER();
 
@@ -570,10 +568,10 @@ bool FdbOrch::addFdbEntry(FdbEntry& entry, const string& port_name, const string
 
     Port port;
     /* Retry until port is created */
-    if (!m_portsOrch->getPort(port_name, port))
+    if (!m_portsOrch->getPort(entry.port_name, port))
     {
-        SWSS_LOG_DEBUG("Saving a fdb entry until port %s becomes active", port_name.c_str());
-        saved_fdb_entries[port_name].push_back({entry, type});
+        SWSS_LOG_DEBUG("Saving a fdb entry until port %s becomes active", entry.port_name.c_str());
+        saved_fdb_entries[entry.port_name].push_back({entry, type});
 
         return true;
     }
@@ -585,11 +583,6 @@ bool FdbOrch::addFdbEntry(FdbEntry& entry, const string& port_name, const string
         saved_fdb_entries[port_name].push_back({entry, type});
 
         return true;
-    }
-
-    if (entry.port_name.empty())
-    {
-        entry.port_name = port_name;
     }
 
     sai_attribute_t attr;
@@ -667,7 +660,7 @@ bool FdbOrch::removeFdbEntry(const FdbEntry& entry)
     Port port;
     m_portsOrch->getPortByBridgePortId(entry.bv_id, port);
 
-    SWSS_LOG_NOTICE("Notifying observers of FDB entry removal");
+    SWSS_LOG_INFO("Notifying observers of FDB entry removal");
     FdbUpdate update = {entry, port, false};
     for (auto observer: m_observers)
     {

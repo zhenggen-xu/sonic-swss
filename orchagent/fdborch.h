@@ -68,7 +68,7 @@ private:
     void doTask(NotificationConsumer& consumer);
 
     void updateVlanMember(const VlanMemberUpdate&);
-    bool addFdbEntry(FdbEntry&, const string&, const string&);
+    bool addFdbEntry(const FdbEntry&, const string&);
     bool removeFdbEntry(const FdbEntry&);
     void flushFDBEntries(sai_object_id_t bridge_port_oid,
                          sai_object_id_t vlan_oid);
