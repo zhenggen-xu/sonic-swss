@@ -75,7 +75,6 @@ private:
     bool clearNextHopFlag(const NextHopKey &, const uint32_t);
 
     void processFDBFlushUpdate(const FdbFlushUpdate &);
-    bool processPortUpdate(const PortUpdate &);
     bool flushNeighborEntry(const NeighborEntry &, const MacAddress &);
 
     void doTask(Consumer &consumer);

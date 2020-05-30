@@ -81,8 +81,8 @@ bool NeighOrch::flushNeighborEntry(const NeighborEntry &entry, const MacAddress 
     IpAddress    ip = entry.ip_address;
     string       alias = entry.alias;
 
-    SWSS_LOG_NOTICE("Flushing ARP entry '%s' as FDB entry '%s' is flushed",
-                    ip.to_string().c_str(), mac.to_string().c_str());
+    SWSS_LOG_INFO("Flushing ARP entry '%s' as FDB entry '%s' is flushed",
+                   ip.to_string().c_str(), mac.to_string().c_str());
 
     if (!m_nl_sock)
     {
@@ -212,7 +212,7 @@ void NeighOrch::processFDBFlushUpdate(const FdbFlushUpdate& update)
             if (neighborEntry.first.alias == vlan.m_alias &&
                 neighborEntry.second == entry.mac)
             {
-                SWSS_LOG_INFO("Flushing ARP [ %s , %s ] = [ port: %s ]",
+                SWSS_LOG_INFO("Flushing ARP [ %s , %s ] = { port: %s }",
                                vlan.m_alias.c_str(),
                                entry.mac.to_string().c_str(),
                                update.port.m_alias.c_str());
@@ -221,33 +221,6 @@ void NeighOrch::processFDBFlushUpdate(const FdbFlushUpdate& update)
         }
     }
     return;
-}
-
-bool NeighOrch::processPortUpdate(const PortUpdate& update)
-{
-    if (update.add)
-    {
-        // Not interested in port add
-        return true;
-    }
-
-    const Port &port = update.port;
-
-    SWSS_LOG_NOTICE("Flushing all ARP entries resolved over interface %s",
-                   port.m_alias.c_str());
-
-    for (const auto &entry : m_syncdNeighbors)
-    {
-        SWSS_LOG_NOTICE("Looking at ARP entry <%s, %s>",
-                        entry.first.ip_address.to_string().c_str(),
-                        entry.first.alias.c_str());
-        if (entry.first.alias == port.m_alias)
-        {
-            return flushNeighborEntry(entry.first, entry.second);
-        }
-    }
-    return true;
-   
 }
 
 void NeighOrch::update(SubjectType type, void *cntx)
@@ -261,12 +234,6 @@ void NeighOrch::update(SubjectType type, void *cntx)
         {
             FdbFlushUpdate *update = reinterpret_cast<FdbFlushUpdate *>(cntx);
             processFDBFlushUpdate(*update);
-            break;
-        }
-        case SUBJECT_TYPE_PORT_CHANGE:
-        {
-            PortUpdate *update = reinterpret_cast<PortUpdate *>(cntx);
-            processPortUpdate(*update);
             break;
         }
         default:
