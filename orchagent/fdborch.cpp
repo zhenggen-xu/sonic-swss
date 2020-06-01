@@ -54,7 +54,7 @@ bool FdbOrch::bake()
     return true;
 }
 
-bool FdbOrch::storeFdbEntryState(FdbUpdate& update)
+bool FdbOrch::storeFdbEntryState(const FdbUpdate& update)
 {
     FdbEntry& entry = update.entry;
     const MacAddress& mac = entry.mac;

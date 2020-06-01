@@ -227,18 +227,25 @@ class TestPortDPBSystem(object):
         dvs.setup_db()
         self.setup_db(dvs);
 
+        portName = "Ethernet0"
+        vrfName = ""
+        ipAddress = "10.0.0.0/31"
+        srv0MAC = "00:00:00:00:01:11"
+
         self.clear_srv_config(dvs)
 
         # Create l3 interface
-        rif_oid = self.create_l3_intf("Ethernet0", "")
+        rif_oid = self.create_l3_intf(portName, vrfName)
 
         # set ip address
-        self.add_ip_address("Ethernet0", "10.0.0.0/31")
+        self.add_ip_address(portName, ipAddress)
 
         # bring up interface
-        self.set_admin_status(dvs, "Ethernet0", "up")
+        self.set_admin_status(dvs, portName, "up")
 
         # Set IP address and default route
+        cmd = "ip link set eth0 address " + srv0MAC
+        dvs.servers[0].runcmd(cmd)
         dvs.servers[0].runcmd("ip address add 10.0.0.1/31 dev eth0")
         dvs.servers[0].runcmd("ip route add default via 10.0.0.0")
 
@@ -255,7 +262,7 @@ class TestPortDPBSystem(object):
         assert status == True
 
         fvs_dict = dict(fvs)
-        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == "46:C1:84:2C:3B:4A"
+        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == srv0MAC
 
         # Breakout port and make sure NEIGHBOR entry is removed
         dvs.verify_port_breakout_mode("Ethernet0", "1x100G[40G]")
@@ -279,6 +286,7 @@ class TestPortDPBSystem(object):
         vlanName = "Vlan" + str(vlanID)
         vrfName = ""
         ipAddress = "10.0.0.0/31"
+        srv0MAC = "00:00:00:00:01:11"
 
         self.create_vlan(vlanID)
 
@@ -295,6 +303,8 @@ class TestPortDPBSystem(object):
         self.add_ip_address(vlanName, ipAddress)
 
         # Set IP address and default route
+        cmd = "ip link set eth0 address " + srv0MAC
+        dvs.servers[0].runcmd(cmd)
         dvs.servers[0].runcmd("ip address add 10.0.0.1/31 dev eth0")
         dvs.servers[0].runcmd("ip route add default via 10.0.0.0")
 
@@ -311,7 +321,7 @@ class TestPortDPBSystem(object):
         assert status == True
 
         fvs_dict = dict(fvs)
-        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == "46:C1:84:2C:3B:4A"
+        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == srv0MAC
 
         # Breakout port and make sure NEIGHBOR entry is removed
         dvs.verify_port_breakout_mode("Ethernet0", "1x100G[40G]")
@@ -324,6 +334,140 @@ class TestPortDPBSystem(object):
 
         dvs.change_port_breakout_mode("Ethernet0", "1x100G[40G]")
         dvs.verify_port_breakout_mode("Ethernet0", "1x100G[40G]")
+
+        # Remove IP from interface, and then remove interface
+        self.remove_ip_address(vlanName, ipAddress)
+        self.remove_l3_intf(vlanName)
+
+        # Remove VLAN(note that member was removed during port breakout)
+        self.remove_vlan(vlanID)
+
+    def test_arp_flush_on_port_oper_shut(self, dvs):
+        dvs.setup_db()
+        self.setup_db(dvs);
+
+        self.clear_srv_config(dvs)
+        vlanID = "100"
+        portName = "Ethernet0"
+        vlanName = "Vlan" + str(vlanID)
+        vrfName = ""
+        ipAddress = "10.0.0.0/31"
+        srv0MAC = "00:00:00:00:01:11"
+
+        self.create_vlan(vlanID)
+
+        self.create_vlan_member(vlanID, portName)
+
+        # bring up interface
+        self.set_admin_status(dvs, portName, "up")
+        self.set_admin_status(dvs, vlanName, "up")
+
+        # create vlan interface
+        rif_oid = self.create_l3_intf(vlanName, vrfName)
+
+        # assign IP to interface
+        self.add_ip_address(vlanName, ipAddress)
+
+        # Set IP address and default route
+        cmd = "ip link set eth0 address " + srv0MAC
+        dvs.servers[0].runcmd(cmd)
+        dvs.servers[0].runcmd("ip address add 10.0.0.1/31 dev eth0")
+        dvs.servers[0].runcmd("ip route add default via 10.0.0.0")
+
+        # Get neighbor and ARP entry
+        dvs.servers[0].runcmd("ping -c 1 10.0.0.0")
+
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY")
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 1
+        route = json.loads(intf_entries[0])
+        assert route["ip"] == "10.0.0.1"
+        assert route["rif"] == rif_oid
+        (status, fvs) = tbl.get(intf_entries[0])
+        assert status == True
+
+        fvs_dict = dict(fvs)
+        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == srv0MAC
+        # Bring link operation state down
+        self.set_admin_status(dvs, portName, "down")
+        dvs.servers[0].runcmd("ip link set dev eth0 down")
+
+        #Verify ARP/Neighbor entry is removed
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 0
+
+        # Bring link operation state up
+        self.set_admin_status(dvs, portName, "up")
+        dvs.servers[0].runcmd("ip link set dev eth0 up")
+
+        # Remove IP from interface, and then remove interface
+        self.remove_ip_address(vlanName, ipAddress)
+        self.remove_l3_intf(vlanName)
+
+        # Remove VLAN member and VLAN
+        self.remove_vlan_member(vlanID, portName)
+        self.remove_vlan(vlanID)
+
+    def test_arp_flush_on_vlan_member_remove(self, dvs):
+        dvs.setup_db()
+        self.setup_db(dvs);
+
+        self.clear_srv_config(dvs)
+        vlanID = "100"
+        portName = "Ethernet0"
+        vlanName = "Vlan" + str(vlanID)
+        vrfName = ""
+        ipAddress = "10.0.0.0/31"
+        srv0MAC = "00:00:00:00:01:11"
+
+        self.create_vlan(vlanID)
+
+        self.create_vlan_member(vlanID, portName)
+
+        # bring up interface
+        self.set_admin_status(dvs, portName, "up")
+        self.set_admin_status(dvs, vlanName, "up")
+
+        # create vlan interface
+        rif_oid = self.create_l3_intf(vlanName, vrfName)
+
+        # assign IP to interface
+        self.add_ip_address(vlanName, ipAddress)
+
+        # Set IP address and default route
+        cmd = "ip link set eth0 address " + srv0MAC
+        dvs.servers[0].runcmd(cmd)
+        dvs.servers[0].runcmd("ip address add 10.0.0.1/31 dev eth0")
+        dvs.servers[0].runcmd("ip route add default via 10.0.0.0")
+
+        # Get neighbor and ARP entry
+        dvs.servers[0].runcmd("ping -c 1 10.0.0.0")
+        time.sleep(2)
+
+        tbl = swsscommon.Table(self.adb, "ASIC_STATE:SAI_OBJECT_TYPE_NEIGHBOR_ENTRY")
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 1
+        route = json.loads(intf_entries[0])
+        assert route["ip"] == "10.0.0.1"
+        assert route["rif"] == rif_oid
+        (status, fvs) = tbl.get(intf_entries[0])
+        assert status == True
+
+        fvs_dict = dict(fvs)
+        assert fvs_dict["SAI_NEIGHBOR_ENTRY_ATTR_DST_MAC_ADDRESS"] == srv0MAC
+        # Remove port from VLAN
+        self.remove_vlan_member(vlanID, portName)
+
+        #Verify ARP/Neighbor entry is removed
+        intf_entries = tbl.getKeys()
+        assert len(intf_entries) == 0
+
+        # Remove IP from interface, and then remove interface
+        self.remove_ip_address(vlanName, ipAddress)
+        self.remove_l3_intf(vlanName)
+
+        # Remove VLAN
+        self.remove_vlan(vlanID)
 
     """
     Below utility functions are required by test_dpb_arp_flush
@@ -367,6 +511,18 @@ class TestPortDPBSystem(object):
         assert len(current_entries - initial_entries) == 1
         return list(current_entries - initial_entries)[0]
 
+    def remove_l3_intf(self, interface):
+        if interface.startswith("PortChannel"):
+            tbl_name = "PORTCHANNEL_INTERFACE"
+        elif interface.startswith("Vlan"):
+            tbl_name = "VLAN_INTERFACE"
+        elif interface.startswith("Loopback"):
+            tbl_name = "LOOPBACK_INTERFACE"
+        else:
+            tbl_name = "INTERFACE"
+        tbl = swsscommon.Table(self.cdb, tbl_name)
+        tbl._del(interface)
+        time.sleep(1)
 
     def add_ip_address(self, interface, ip):
         if interface.startswith("PortChannel"):
@@ -381,6 +537,19 @@ class TestPortDPBSystem(object):
         tbl = swsscommon.Table(self.cdb, tbl_name)
         fvs = swsscommon.FieldValuePairs([("NULL", "NULL")])
         tbl.set(interface + "|" + ip, fvs)
+        time.sleep(1)
+
+    def remove_ip_address(self, interface, ip):
+        if interface.startswith("PortChannel"):
+            tbl_name = "PORTCHANNEL_INTERFACE"
+        elif interface.startswith("Vlan"):
+            tbl_name = "VLAN_INTERFACE"
+        elif interface.startswith("Loopback"):
+            tbl_name = "LOOPBACK_INTERFACE"
+        else:
+            tbl_name = "INTERFACE"
+        tbl = swsscommon.Table(self.cdb, tbl_name)
+        tbl._del(interface + "|" + ip)
         time.sleep(1)
 
     def clear_srv_config(self, dvs):
@@ -404,6 +573,11 @@ class TestPortDPBSystem(object):
         tbl = swsscommon.Table(self.cdb, "VLAN_MEMBER")
         fvs = swsscommon.FieldValuePairs([("tagging_mode", "untagged")])
         tbl.set("Vlan" + vlan_id + "|" + interface, fvs)
+        time.sleep(1)
+
+    def remove_vlan_member(self, vlan_id, interface):
+        tbl = swsscommon.Table(self.cdb, "VLAN_MEMBER")
+        tbl._del("Vlan" + vlan_id + "|" + interface)
         time.sleep(1)
 
     def set_admin_status(self, dvs, interface, status):

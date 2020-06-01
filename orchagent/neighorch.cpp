@@ -185,11 +185,12 @@ void NeighOrch::processFDBFlushUpdate(const FdbFlushUpdate& update)
     SWSS_LOG_NOTICE("processFDBFlushUpdate port: %s",
                     update.port.m_alias.c_str());
 
+    /*
     if (update.port.m_admin_state_up == true &&
         update.port.m_oper_status == SAI_PORT_OPER_STATUS_UP)
     {
         return;
-    }
+    } */
 
     for (auto entry : update.entries)
     {

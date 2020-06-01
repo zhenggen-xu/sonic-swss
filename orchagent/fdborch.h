@@ -73,7 +73,7 @@ private:
     void flushFDBEntries(sai_object_id_t bridge_port_oid,
                          sai_object_id_t vlan_oid);
 
-    bool storeFdbEntryState(FdbUpdate& update);
+    bool storeFdbEntryState(const FdbUpdate& update);
 };
 
 #endif /* SWSS_FDBORCH_H */
