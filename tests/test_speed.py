@@ -27,6 +27,9 @@ class TestSpeedSet(object):
         asic_port_table = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_PORT")
         asic_profile_table = swsscommon.Table(adb, "ASIC_STATE:SAI_OBJECT_TYPE_BUFFER_PROFILE")
 
+        # Get speed from the first port we hit in ASIC DB port walk, and
+        # assume that its the initial configured speed for all ports, and
+        # dynamic buffer profile has already been created for it.
         asic_port_records = asic_port_table.getKeys()
         for k in asic_port_records:
             (status, fvs) = asic_port_table.get(k)
@@ -34,6 +37,8 @@ class TestSpeedSet(object):
             for fv in fvs:
                 if fv[0] == "SAI_PORT_ATTR_SPEED":
                     configured_speed_list.append(fv[1])
+                    break
+
             if len(configured_speed_list):
                 break;
 
@@ -43,7 +48,7 @@ class TestSpeedSet(object):
         #    "ingress_lossy_profile"
         #    "egress_lossless_profile"
         #    "egress_lossy_profile"
-        #    "pg_lossless_40000_300m_profile"
+        #    "pg_lossless_<initial_speed>_300m_profile"
         # check if they get the DB
         assert expected_buffer_profiles_num == 4
         # and if they were successfully created on ASIC
