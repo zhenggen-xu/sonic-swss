@@ -2,6 +2,7 @@
 #include "intfsorch.h"
 #include "bufferorch.h"
 #include "neighorch.h"
+#include "fdborch.h"
 
 #include <inttypes.h>
 #include <cassert>
@@ -38,6 +39,7 @@ extern sai_object_id_t gSwitchId;
 extern sai_fdb_api_t *sai_fdb_api;
 extern IntfsOrch *gIntfsOrch;
 extern NeighOrch *gNeighOrch;
+extern FdbOrch *gFdbOrch;
 extern CrmOrch *gCrmOrch;
 extern BufferOrch *gBufferOrch;
 
@@ -2601,11 +2603,12 @@ void PortsOrch::doLagTask(Consumer &consumer)
                     {
                         gNeighOrch->ifChangeInformNextHop(alias, false);
                         Port lag;
+                        lag.m_oper_status = SAI_PORT_OPER_STATUS_DOWN;
                         if (getPort(alias, lag))
                         {
                             SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
                                 " as it is DOWN", alias.c_str(), lag.m_bridge_port_id);
-                            flushFDBEntries(lag.m_bridge_port_id);
+                            flushFDBEntries(lag);
                         }
                     }
                     else
@@ -3216,9 +3219,6 @@ bool PortsOrch::removeBridgePort(Port &port)
                 hostif_vlan_tag[SAI_HOSTIF_VLAN_TAG_STRIP], port.m_alias.c_str());
         return false;
     }
-
-    /* Flush FDB entries pointing to this bridge port */
-    flushFDBEntries(port.m_bridge_port_id);
 
     /* Remove bridge port */
     status = sai_bridge_api->remove_bridge_port(port.m_bridge_port_id);
@@ -3926,7 +3926,7 @@ void PortsOrch::doTask(NotificationConsumer &consumer)
             {
                 SWSS_LOG_NOTICE("Flushing FDB entries for %s with bridge port id: %" PRIx64
                     " as it is DOWN", port.m_alias.c_str(), port.m_bridge_port_id);
-                flushFDBEntries(port.m_bridge_port_id);
+                flushFDBEntries(port);
             }
 
             /* update m_portList */
@@ -4114,23 +4114,24 @@ void PortsOrch::getPortSerdesVal(const std::string& val_str,
     }
 }
 
-void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
+void PortsOrch::flushFDBEntries(Port &port)
 {
+    sai_object_id_t bridge_port_id = port.m_bridge_port_id;
     sai_attribute_t attr;
     vector<sai_attribute_t> attrs;
     sai_status_t rv;
 
-    // If bridge port ID and bvis both are are NOT specified,
+    // If bridge port ID and bvid both are are NOT specified,
     // SAI REDIS will flush all FDB entries. This function is meant
     // to delete passed in bridge_port_id's FDB entries only.
-    // Hence bridge_port_id cannot SAI_NULL_OBJECT_ID.
+    // Hence bridge_port_id cannot be SAI_NULL_OBJECT_ID.
     if (SAI_NULL_OBJECT_ID == bridge_port_id)
     {
         SWSS_LOG_WARN("NOT flushing FDB entries as bridge port ID:0x0");
         return;
     }
 
-    SWSS_LOG_INFO("Flushing the port with bridge port id: %" PRIx64, bridge_port_id);
+    SWSS_LOG_INFO("Flushing FDB entry with bridge port id: %" PRIx64, bridge_port_id);
     attr.id = SAI_FDB_FLUSH_ATTR_BRIDGE_PORT_ID;
     attr.value.oid = bridge_port_id;
     attrs.push_back(attr);
@@ -4139,5 +4140,18 @@ void PortsOrch::flushFDBEntries(sai_object_id_t bridge_port_id)
     if (rv != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_ERROR("Flush fdb by bridge port id: %" PRIx64 " failed: %d", bridge_port_id, rv);
+    }
+
+    // Find every VLAN that contains this port as member
+    // and notify observers to flush ARP entries
+    for (const auto& vlan : m_portList)
+    {
+        if ((vlan.second.m_type == Port::VLAN) &&
+            (vlan.second.m_members.find(port.m_alias) !=
+             vlan.second.m_members.end()))
+        {
+            sai_object_id_t bvid = vlan.second.m_vlan_info.vlan_oid;
+            gFdbOrch->notifyObserversFDBFlush(port, bvid);
+        }
     }
 }
