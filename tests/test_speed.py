@@ -37,8 +37,6 @@ class TestSpeedSet(object):
             if len(configured_speed_list):
                 break;
 
-        import pdb
-        pdb.set_trace()
         buffer_profiles = cfg_buffer_profile_table.getKeys()
         expected_buffer_profiles_num = len(buffer_profiles)
         # buffers_config.j2 used for the test defines 3 static profiles and 1 dynamic profiles:
