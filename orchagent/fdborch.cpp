@@ -56,7 +56,7 @@ bool FdbOrch::bake()
 
 bool FdbOrch::storeFdbEntryState(const FdbUpdate& update)
 {
-    FdbEntry& entry = update.entry;
+    const FdbEntry& entry = update.entry;
     const MacAddress& mac = entry.mac;
     Port vlan;
 
