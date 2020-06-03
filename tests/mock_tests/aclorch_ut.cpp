@@ -339,14 +339,14 @@ namespace aclorch_test
         {
             AclTestBase::TearDown();
 
-            delete gFdbOrch;
-            gFdbOrch = nullptr;
             delete gMirrorOrch;
             gMirrorOrch = nullptr;
             delete gRouteOrch;
             gRouteOrch = nullptr;
             delete gNeighOrch;
             gNeighOrch = nullptr;
+            delete gFdbOrch;
+            gFdbOrch = nullptr;
             delete gIntfsOrch;
             gIntfsOrch = nullptr;
             delete gVrfOrch;
