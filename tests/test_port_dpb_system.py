@@ -255,7 +255,7 @@ class TestPortDPBSystem(object):
         self.dvs_acl.remove_acl_table("test")
         self.dvs_acl.verify_acl_table_count(0)
 
-    def test_cli_command_with_hyphen_f_option(self, dvs):
+    def test_cli_command_with_force_option(self, dvs):
 
         dvs.setup_db()
         dpb = DPB()
@@ -374,7 +374,7 @@ class TestPortDPBSystem(object):
         dvs.change_port_breakout_mode("Ethernet8", breakoutMode1x)
         dpb.verify_port_breakout_mode(dvs, "Ethernet8", breakoutMode1x)
 
-    def test_cli_command_with_hyphen_l_option(self, dvs):
+    def test_cli_command_with_load_default_port_config_option(self, dvs):
         dvs.setup_db()
         dpb = DPB()
         self.setup_db(dvs);
