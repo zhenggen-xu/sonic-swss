@@ -171,7 +171,12 @@ class DockerVirtualSwitch(object):
         self.teamd = ['teamsyncd', 'teammgrd']
         self.natd = ['natsyncd', 'natmgrd']
         self.alld  = self.basicd + self.swssd + self.syncd + self.rtd + self.teamd + self.natd
-        self.client = docker.from_env()
+        # Dynamic port breakout command may wait for 60 second incase of breakout failure.
+        # So, to avoid socket read timeout, setting timeout to 300 seconds
+        # Tries with 120 seconds, but still saw the failure, but 300 seconds consistently
+        # succeeded. Hence keeping it to 300 seconds while we dig deeper on why it
+        # take more than 60 seconds.
+        self.client = docker.from_env(timeout=300)
         self.appldb = None
 
         if subprocess.check_call(["/sbin/modprobe", "team"]) != 0:
